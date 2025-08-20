@@ -29,11 +29,10 @@
 - **Production Ready**: Containerized for Azure Container Apps deployment
 - **Health Checks**: Built-in container health monitoring
 
-#### 📜 **Demo Scripts**
-- **Performance Testing**: Automated API response time testing
-- **Interactive Demos**: Scripts to demonstrate real-time frontend updates
-- **Backend Testing**: Comprehensive API endpoint testing
-- **Workshop Tools**: Educational scripts for learning purposes
+#### 📜 **Essential Scripts**
+- **Local Testing**: Automated local development validation
+- **Azure Deployment**: Production deployment to Container Apps
+- **Development Tools**: Essential utilities for workshop delivery
 
 ### 🛠️ **Technical Specifications**
 

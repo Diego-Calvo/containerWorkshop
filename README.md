@@ -57,11 +57,10 @@ containerAppWorkshop/
 │   ├── workflows/                     # CI/CD pipelines
 │   └── copilot-instructions.md
 ├── docs/                             # Workshop documentation
-│   ├── workshop-guide.md
-│   └── exercises/
+│   └── workshop-guide.md
 └── scripts/                          # Deployment and utility scripts
     ├── build-and-deploy.ps1
-    └── quick-start.ps1
+    └── test-local.ps1
 ```
 
 ## 🚀 Quick Start
@@ -86,13 +85,10 @@ containerAppWorkshop/
    - Backend API: http://localhost:3001 (Node.js with health checks)
    - API Documentation: http://localhost:3001/health
 
-3. **Test the real-time features**
+3. **Test the application**
    ```powershell
-   # Run interactive demo to see backend-frontend sync
-   .\scripts\simple-demo.ps1
-   
-   # Test performance
-   .\scripts\performance-test.ps1
+   # Test local development setup
+   .\scripts\test-local.ps1
    ```
 
 ### Azure Container Apps Deployment
