@@ -12,8 +12,48 @@ function App() {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [animatingTodos, setAnimatingTodos] = useState(new Set());
   
+  // Network activity state
+  const [networkActivity, setNetworkActivity] = useState([]);
+  const [activeRequests, setActiveRequests] = useState(0);
+  const [lastApiCall, setLastApiCall] = useState(null);
+  
   // Get API URL from environment or use default for local development
   const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+
+  // Helper function to log API calls
+  const logApiCall = (endpoint, method = 'GET', status = 'loading') => {
+    const timestamp = new Date();
+    const apiCall = {
+      id: Date.now(),
+      endpoint,
+      method,
+      status,
+      timestamp,
+      containerSource: 'Backend Container (Node.js)',
+      url: `${API_BASE}${endpoint}`
+    };
+    
+    setLastApiCall(apiCall);
+    setNetworkActivity(prev => [apiCall, ...prev.slice(0, 4)]); // Keep last 5 calls
+    
+    if (status === 'loading') {
+      setActiveRequests(prev => prev + 1);
+    } else {
+      setActiveRequests(prev => Math.max(0, prev - 1));
+    }
+  };
+
+  // Helper function to update API call status
+  const updateApiCallStatus = (endpoint, status, responseTime) => {
+    setNetworkActivity(prev => 
+      prev.map(call => 
+        call.endpoint === endpoint && call.status === 'loading'
+          ? { ...call, status, responseTime, completedAt: new Date() }
+          : call
+      )
+    );
+    setActiveRequests(prev => Math.max(0, prev - 1));
+  };
 
   useEffect(() => {
     fetchTodos();
@@ -32,43 +72,68 @@ function App() {
   const fetchTodos = async () => {
     setLoading(true);
     setError('');
+    const startTime = Date.now();
+    logApiCall('/api/todos', 'GET', 'loading');
+    
     try {
       const response = await fetch(`${API_BASE}/api/todos`);
+      const responseTime = Date.now() - startTime;
+      
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const data = await response.json();
       setTodos(data);
       setLastUpdated(new Date());
+      updateApiCallStatus('/api/todos', 'success', responseTime);
     } catch (error) {
       console.error('Error fetching todos:', error);
       setError('Failed to load todos. Please check if the backend is running.');
+      updateApiCallStatus('/api/todos', 'error', Date.now() - startTime);
     } finally {
       setLoading(false);
     }
   };
 
   const fetchStats = async () => {
+    const startTime = Date.now();
+    logApiCall('/api/stats', 'GET', 'loading');
+    
     try {
       const response = await fetch(`${API_BASE}/api/stats`);
+      const responseTime = Date.now() - startTime;
+      
       if (response.ok) {
         const data = await response.json();
         setStats(data);
+        updateApiCallStatus('/api/stats', 'success', responseTime);
+      } else {
+        updateApiCallStatus('/api/stats', 'error', responseTime);
       }
     } catch (error) {
       console.error('Error fetching stats:', error);
+      updateApiCallStatus('/api/stats', 'error', Date.now() - startTime);
     }
   };
 
   const fetchSystemHealth = async () => {
+    const startTime = Date.now();
+    logApiCall('/health', 'GET', 'loading');
+    
     try {
       const response = await fetch(`${API_BASE}/health`);
+      const responseTime = Date.now() - startTime;
+      
       if (response.ok) {
         const data = await response.json();
         setSystemHealth(data);
+        updateApiCallStatus('/health', 'success', responseTime);
+      } else {
+        updateApiCallStatus('/health', 'error', responseTime);
       }
     } catch (error) {
       console.error('Error fetching health:', error);
+      updateApiCallStatus('/health', 'error', Date.now() - startTime);
     }
   };
 
@@ -77,6 +142,9 @@ function App() {
     
     setLoading(true);
     setError('');
+    const startTime = Date.now();
+    logApiCall('/api/todos', 'POST', 'loading');
+    
     try {
       const response = await fetch(`${API_BASE}/api/todos`, {
         method: 'POST',
@@ -86,12 +154,15 @@ function App() {
         body: JSON.stringify({ text: newTodo, completed: false })
       });
       
+      const responseTime = Date.now() - startTime;
+      
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
       const newTodoItem = await response.json();
       setNewTodo('');
+      updateApiCallStatus('/api/todos', 'success', responseTime);
       
       // Add animation effect
       setAnimatingTodos(prev => new Set([...prev, newTodoItem.id]));
@@ -108,6 +179,7 @@ function App() {
     } catch (error) {
       console.error('Error adding todo:', error);
       setError('Failed to add todo. Please try again.');
+      updateApiCallStatus('/api/todos', 'error', Date.now() - startTime);
     } finally {
       setLoading(false);
     }
@@ -150,21 +222,27 @@ function App() {
     if (!window.confirm('Are you sure you want to delete this todo?')) return;
     
     setAnimatingTodos(prev => new Set([...prev, id]));
+    const startTime = Date.now();
+    logApiCall(`/api/todos/${id}`, 'DELETE', 'loading');
     
     try {
       const response = await fetch(`${API_BASE}/api/todos/${id}`, {
         method: 'DELETE',
       });
       
+      const responseTime = Date.now() - startTime;
+      
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
+      updateApiCallStatus(`/api/todos/${id}`, 'success', responseTime);
       await fetchTodos();
       await fetchStats();
     } catch (error) {
       console.error('Error deleting todo:', error);
       setError('Failed to delete todo. Please try again.');
+      updateApiCallStatus(`/api/todos/${id}`, 'error', Date.now() - startTime);
     }
   };
 
@@ -207,6 +285,58 @@ function App() {
             </div>
             {systemHealth?.dapr?.enabled && (
               <div className="dapr-status">🔧 DAPR Enabled</div>
+            )}
+          </div>
+        </div>
+
+        {/* Container Network Activity Dashboard */}
+        <div className="network-activity-dashboard">
+          <h3>🔗 Container Communication</h3>
+          <div className="container-info">
+            <div className="container-card frontend">
+              <div className="container-title">🌐 Frontend Container</div>
+              <div className="container-details">React (nginx) - Port 3000</div>
+              <div className="container-status">✅ Active</div>
+            </div>
+            <div className="network-arrow">
+              <div className={`arrow ${activeRequests > 0 ? 'active' : ''}`}>
+                {activeRequests > 0 ? '🔄' : '➡️'}
+              </div>
+              <div className="network-label">
+                {activeRequests > 0 ? `${activeRequests} Active API Calls` : 'API Calls'}
+              </div>
+            </div>
+            <div className="container-card backend">
+              <div className="container-title">⚙️ Backend Container</div>
+              <div className="container-details">Node.js API - Port 3001</div>
+              <div className="container-status">
+                {systemHealth?.status === 'healthy' ? '✅ Healthy' : '❌ Unhealthy'}
+              </div>
+            </div>
+          </div>
+          
+          {/* Recent API Calls */}
+          <div className="api-calls-log">
+            <h4>📡 Recent API Activity</h4>
+            {networkActivity.length > 0 ? (
+              <div className="api-calls-list">
+                {networkActivity.slice(0, 3).map((call) => (
+                  <div key={call.id} className={`api-call-item ${call.status}`}>
+                    <div className="api-call-method">{call.method}</div>
+                    <div className="api-call-endpoint">{call.endpoint}</div>
+                    <div className="api-call-status">
+                      {call.status === 'loading' && '⏳ Loading...'}
+                      {call.status === 'success' && `✅ ${call.responseTime}ms`}
+                      {call.status === 'error' && '❌ Error'}
+                    </div>
+                    <div className="api-call-time">
+                      {call.timestamp.toLocaleTimeString()}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="no-activity">No recent API activity</div>
             )}
           </div>
         </div>
