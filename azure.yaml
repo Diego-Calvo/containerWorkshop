@@ -1,0 +1,37 @@
+# Azure Developer CLI (azd) template configuration
+name: container-app-workshop
+metadata:
+  template: container-app-workshop@1.0.0
+  description: Azure Container Apps Workshop - Two-tier application with React frontend and Node.js DAPR-enabled backend
+
+services:
+  frontend:
+    project: ./frontend
+    language: js
+    host: containerapp
+    docker:
+      path: ./frontend/Dockerfile
+      context: ./frontend
+      platform: amd64
+
+  backend:
+    project: ./backend
+    language: js
+    host: containerapp
+    docker:
+      path: ./backend/Dockerfile
+      context: ./backend
+      platform: amd64
+
+hooks:
+  postdeploy:
+    windows:
+      shell: pwsh
+      run: |
+        echo "Workshop application deployed successfully!"
+        echo "Check the Azure portal for your application URLs"
+    posix:
+      shell: sh
+      run: |
+        echo "Workshop application deployed successfully!"
+        echo "Check the Azure portal for your application URLs"

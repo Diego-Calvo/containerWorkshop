@@ -1,0 +1,38 @@
+{
+  "name": "workshop-backend",
+  "version": "1.0.0",
+  "description": "Azure Container Apps Workshop - Backend API with DAPR",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js",
+    "test": "jest",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "@dapr/dapr": "^3.2.0",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "helmet": "^7.0.0",
+    "morgan": "^1.10.0",
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.45.0",
+    "jest": "^29.6.1",
+    "nodemon": "^3.0.1",
+    "supertest": "^6.3.3"
+  },
+  "keywords": [
+    "azure",
+    "container-apps",
+    "dapr",
+    "nodejs",
+    "workshop"
+  ],
+  "author": "Azure Container Apps Workshop",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
