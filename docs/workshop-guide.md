@@ -3,12 +3,287 @@
 ## 📋 Overview
 This guide covers **Part 2** of the workshop - deploying and updating the two-tier application to existing Azure Container Apps infrastructure.
 
-**Prerequisites (Infrastructure already deployed):**
+## 🔧 Prerequisites & Infrastructure Setup
+
+### **Required Infrastructure (Pre-deployed)**
 - ✅ Azure Container Apps Environment created
 - ✅ Two Container Apps created: `workshop-frontend` and `workshop-backend`
 - ✅ Azure Container Registry (ACR) provisioned
 - ✅ DAPR components configured
 - ✅ Resource group and networking setup complete
+
+### **Development Environment Requirements**
+
+#### **Local Development Tools**
+```powershell
+# Required software installations
+# 1. Azure CLI (latest version)
+az --version
+# Expected: azure-cli 2.60.0+
+
+# 2. Docker Desktop (with Linux containers)
+docker --version
+# Expected: Docker version 24.0.0+
+
+# 3. Git (for source control)
+git --version
+# Expected: git version 2.40.0+
+
+# 4. Node.js (for local development)
+node --version
+npm --version
+# Expected: Node.js v18.20.0+, npm 10.0.0+
+
+# 5. PowerShell 7+ (recommended)
+$PSVersionTable.PSVersion
+# Expected: 7.3.0+
+```
+
+#### **Azure Account Requirements**
+- Active Azure subscription with Contributor role
+- Azure CLI authenticated and configured
+- Access to workshop resource group
+- Container Registry push/pull permissions
+
+### **🎛️ DAPR Component Configuration Details**
+
+#### **State Store Component (Redis)**
+The workshop uses Redis as the state store for persistent data management:
+
+```yaml
+# File: backend/dapr-components/statestore.yaml
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: statestore
+  namespace: default
+spec:
+  type: state.redis
+  version: v1
+  metadata:
+  - name: redisHost
+    value: redis:6379
+  - name: redisPassword
+    value: ""
+  - name: enableTLS
+    value: false
+  - name: redisDB
+    value: "0"
+  - name: maxRetries
+    value: "3"
+  - name: maxRetryBackoff
+    value: "2s"
+scopes:
+- workshop-api
+```
+
+**Configuration Details:**
+- **Component Type:** `state.redis` - Redis-based state management
+- **Version:** `v1` - Stable DAPR Redis component version
+- **Redis Host:** `redis:6379` - Docker Compose service name and port
+- **Security:** No TLS/password for local development
+- **Database:** Uses Redis DB 0 (default)
+- **Retry Logic:** Max 3 retries with 2-second backoff
+- **Scopes:** Limited to `workshop-api` application
+
+#### **Pub/Sub Component (Redis)**
+Event-driven communication between microservices:
+
+```yaml
+# File: backend/dapr-components/pubsub.yaml
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: pubsub
+  namespace: default
+spec:
+  type: pubsub.redis
+  version: v1
+  metadata:
+  - name: redisHost
+    value: redis:6379
+  - name: redisPassword
+    value: ""
+  - name: enableTLS
+    value: false
+  - name: consumerID
+    value: workshop-consumer
+  - name: processingTimeout
+    value: "15s"
+  - name: redeliverInterval
+    value: "60s"
+scopes:
+- workshop-api
+```
+
+**Configuration Details:**
+- **Component Type:** `pubsub.redis` - Redis-based publish/subscribe
+- **Consumer ID:** `workshop-consumer` - Unique identifier for message processing
+- **Processing Timeout:** 15 seconds - Max time for message processing
+- **Redelivery:** 60-second interval for failed messages
+- **Reliability:** Ensures message delivery with retry mechanisms
+
+### **🚀 Azure Container Apps DAPR Configuration**
+
+#### **Environment-Level DAPR Setup**
+When deploying to Azure Container Apps, DAPR components are configured at the environment level:
+
+```bash
+# Create DAPR state store component in Azure
+az containerapp env dapr-component set \
+  --name workshop-env \
+  --resource-group workshop-rg \
+  --dapr-component-name statestore \
+  --yaml "
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: statestore
+spec:
+  type: state.azure.cosmosdb
+  version: v1
+  metadata:
+  - name: url
+    value: 'COSMOS_DB_ENDPOINT'
+  - name: masterKey
+    secretRef: cosmos-key
+  - name: database
+    value: 'workshopdb'
+  - name: collection
+    value: 'todos'
+scopes:
+- workshop-backend
+"
+
+# Create DAPR pub/sub component in Azure
+az containerapp env dapr-component set \
+  --name workshop-env \
+  --resource-group workshop-rg \
+  --dapr-component-name pubsub \
+  --yaml "
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: pubsub
+spec:
+  type: pubsub.azure.servicebus
+  version: v1
+  metadata:
+  - name: connectionString
+    secretRef: servicebus-connection
+scopes:
+- workshop-backend
+"
+```
+
+#### **Container App DAPR Integration**
+Backend application configuration with DAPR sidecar:
+
+```bash
+# Backend container app with DAPR enabled
+az containerapp create \
+  --name workshop-backend \
+  --resource-group workshop-rg \
+  --environment workshop-env \
+  --image workshop.azurecr.io/backend:latest \
+  --target-port 3001 \
+  --ingress external \
+  --enable-dapr \
+  --dapr-app-id workshop-api \
+  --dapr-app-port 3001 \
+  --dapr-app-protocol http \
+  --env-vars \
+    "DAPR_ENABLED=true" \
+    "DAPR_APP_PORT=3001" \
+    "NODE_ENV=production"
+```
+
+**DAPR Configuration Parameters:**
+- **`--enable-dapr`:** Enables DAPR sidecar injection
+- **`--dapr-app-id`:** Unique identifier matching component scopes
+- **`--dapr-app-port`:** Port where your app listens
+- **`--dapr-app-protocol`:** Communication protocol (http/grpc)
+
+### **📊 Environment Variables & Secrets**
+
+#### **Local Development (.env)**
+```env
+# DAPR Configuration
+DAPR_ENABLED=false
+DAPR_APP_PORT=3001
+DAPR_HTTP_PORT=3500
+DAPR_GRPC_PORT=50001
+
+# Application Settings
+NODE_ENV=development
+PORT=3001
+CORS_ORIGIN=http://localhost:3000
+
+# Redis Connection (Local)
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=""
+```
+
+#### **Azure Container Apps Environment**
+```bash
+# Set environment variables for production
+az containerapp update \
+  --name workshop-backend \
+  --resource-group workshop-rg \
+  --set-env-vars \
+    "DAPR_ENABLED=true" \
+    "NODE_ENV=production" \
+    "CORS_ORIGIN=https://workshop-frontend.domain.com"
+
+# Set secrets for sensitive data
+az containerapp secret set \
+  --name workshop-backend \
+  --resource-group workshop-rg \
+  --secrets \
+    cosmos-key="YOUR_COSMOS_DB_KEY" \
+    servicebus-connection="YOUR_SERVICEBUS_CONNECTION_STRING"
+```
+
+### **🔍 DAPR Component Verification**
+
+#### **Local Testing Commands**
+```powershell
+# Check DAPR components status
+dapr components --kubernetes
+
+# Test state store connectivity
+curl http://localhost:3500/v1.0/state/statestore
+
+# Test pub/sub subscription
+curl http://localhost:3500/v1.0/publish/pubsub/todo-events \
+  -H "Content-Type: application/json" \
+  -d '{"message": "test"}'
+
+# View DAPR sidecar logs
+docker logs dapr_workshop-api_1
+```
+
+#### **Azure Testing Commands**
+```bash
+# List DAPR components in environment
+az containerapp env dapr-component list \
+  --name workshop-env \
+  --resource-group workshop-rg \
+  --output table
+
+# Check container app DAPR status
+az containerapp show \
+  --name workshop-backend \
+  --resource-group workshop-rg \
+  --query "properties.configuration.dapr"
+
+# View application logs with DAPR traces
+az containerapp logs show \
+  --name workshop-backend \
+  --resource-group workshop-rg \
+  --follow
+```
 
 ---
 
