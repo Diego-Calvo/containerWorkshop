@@ -1,0 +1,270 @@
+name: Deploy to Azure Container Apps (Dev Environment)
+
+on:
+  push:
+    branches: [ dev ]
+  pull_request:
+    branches: [ dev ]
+  workflow_dispatch:
+    inputs:
+      resourceGroupName:
+        description: 'Resource Group Name'
+        required: false
+        default: 'containerWorkshop'
+      location:
+        description: 'Azure Region'
+        required: false
+        default: 'eastus2'
+      environmentName:
+        description: 'Container Apps Environment Name'
+        required: false
+        default: 'workshop-dev-env'
+
+env:
+  # Default values - can be overridden by workflow inputs or repository variables
+  RESOURCE_GROUP_NAME: ${{ github.event.inputs.resourceGroupName || vars.RESOURCE_GROUP_NAME || 'containerWorkshop' }}
+  LOCATION: ${{ github.event.inputs.location || vars.AZURE_LOCATION || 'eastus2' }}
+  ENVIRONMENT_NAME: ${{ github.event.inputs.environmentName || vars.ENVIRONMENT_NAME || 'workshop-dev-env' }}
+  
+  # Container Registry will be created dynamically
+  CONTAINER_REGISTRY_NAME: ${{ vars.CONTAINER_REGISTRY_NAME || format('workshopacr{0}', github.run_number) }}
+  
+  # Application settings
+  FRONTEND_APP_NAME: workshop-frontend-dev
+  BACKEND_APP_NAME: workshop-backend-dev
+
+jobs:
+  # Infrastructure deployment job
+  deploy-infrastructure:
+    runs-on: ubuntu-latest
+    outputs:
+      containerRegistryName: ${{ steps.deploy.outputs.containerRegistryName }}
+      containerRegistryLoginServer: ${{ steps.deploy.outputs.containerRegistryLoginServer }}
+      environmentName: ${{ steps.deploy.outputs.environmentName }}
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Azure CLI Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Create Resource Group
+      run: |
+        az group create \
+          --name ${{ env.RESOURCE_GROUP_NAME }} \
+          --location ${{ env.LOCATION }} \
+          --tags \
+            "Environment=Development" \
+            "Project=ContainerWorkshop" \
+            "DeployedBy=GitHubActions" \
+            "Branch=${{ github.ref_name }}"
+
+    - name: Deploy Infrastructure
+      id: deploy
+      run: |
+        # Deploy the Bicep template
+        DEPLOYMENT_OUTPUT=$(az deployment group create \
+          --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+          --template-file infrastructure/bicep/main.bicep \
+          --parameters \
+            environmentName="${{ env.ENVIRONMENT_NAME }}" \
+            location="${{ env.LOCATION }}" \
+            namePrefix="workshop" \
+            containerRegistryName="${{ env.CONTAINER_REGISTRY_NAME }}" \
+          --query 'properties.outputs' \
+          --output json)
+        
+        # Extract outputs
+        REGISTRY_NAME=$(echo $DEPLOYMENT_OUTPUT | jq -r '.containerRegistryName.value')
+        REGISTRY_LOGIN_SERVER=$(echo $DEPLOYMENT_OUTPUT | jq -r '.containerRegistryLoginServer.value')
+        ENV_NAME=$(echo $DEPLOYMENT_OUTPUT | jq -r '.environmentName.value')
+        
+        # Set outputs for next job
+        echo "containerRegistryName=$REGISTRY_NAME" >> $GITHUB_OUTPUT
+        echo "containerRegistryLoginServer=$REGISTRY_LOGIN_SERVER" >> $GITHUB_OUTPUT
+        echo "environmentName=$ENV_NAME" >> $GITHUB_OUTPUT
+        
+        echo "✅ Infrastructure deployed successfully"
+        echo "📦 Container Registry: $REGISTRY_NAME"
+        echo "🌐 Login Server: $REGISTRY_LOGIN_SERVER"
+        echo "🏗️ Environment: $ENV_NAME"
+
+  # Application deployment job
+  deploy-applications:
+    runs-on: ubuntu-latest
+    needs: deploy-infrastructure
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Azure CLI Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Login to Container Registry
+      run: |
+        az acr login --name ${{ needs.deploy-infrastructure.outputs.containerRegistryName }}
+
+    - name: Build and Push Frontend Container
+      run: |
+        REGISTRY_SERVER=${{ needs.deploy-infrastructure.outputs.containerRegistryLoginServer }}
+        IMAGE_TAG="dev-${{ github.sha }}"
+        
+        # Build frontend image
+        docker build -t $REGISTRY_SERVER/workshop-frontend:$IMAGE_TAG \
+                     -t $REGISTRY_SERVER/workshop-frontend:latest \
+                     ./frontend
+        
+        # Push images
+        docker push $REGISTRY_SERVER/workshop-frontend:$IMAGE_TAG
+        docker push $REGISTRY_SERVER/workshop-frontend:latest
+        
+        echo "✅ Frontend image pushed: $REGISTRY_SERVER/workshop-frontend:$IMAGE_TAG"
+
+    - name: Build and Push Backend Container
+      run: |
+        REGISTRY_SERVER=${{ needs.deploy-infrastructure.outputs.containerRegistryLoginServer }}
+        IMAGE_TAG="dev-${{ github.sha }}"
+        
+        # Build backend image
+        docker build -t $REGISTRY_SERVER/workshop-backend:$IMAGE_TAG \
+                     -t $REGISTRY_SERVER/workshop-backend:latest \
+                     ./backend
+        
+        # Push images
+        docker push $REGISTRY_SERVER/workshop-backend:$IMAGE_TAG
+        docker push $REGISTRY_SERVER/workshop-backend:latest
+        
+        echo "✅ Backend image pushed: $REGISTRY_SERVER/workshop-backend:$IMAGE_TAG"
+
+    - name: Deploy Backend Container App
+      run: |
+        REGISTRY_SERVER=${{ needs.deploy-infrastructure.outputs.containerRegistryLoginServer }}
+        IMAGE_TAG="dev-${{ github.sha }}"
+        
+        az containerapp create \
+          --name ${{ env.BACKEND_APP_NAME }} \
+          --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+          --environment ${{ needs.deploy-infrastructure.outputs.environmentName }} \
+          --image $REGISTRY_SERVER/workshop-backend:$IMAGE_TAG \
+          --registry-server $REGISTRY_SERVER \
+          --target-port 3001 \
+          --ingress external \
+          --min-replicas 1 \
+          --max-replicas 3 \
+          --cpu 0.5 \
+          --memory 1Gi \
+          --enable-dapr \
+          --dapr-app-id workshop-api \
+          --dapr-app-port 3001 \
+          --env-vars \
+            "NODE_ENV=production" \
+            "DAPR_ENABLED=true" \
+            "PORT=3001" \
+          --tags \
+            "Environment=Development" \
+            "Application=Backend" \
+            "Version=$IMAGE_TAG"
+        
+        # Get backend URL
+        BACKEND_URL=$(az containerapp show \
+          --name ${{ env.BACKEND_APP_NAME }} \
+          --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+          --query 'properties.configuration.ingress.fqdn' \
+          --output tsv)
+        
+        echo "✅ Backend deployed: https://$BACKEND_URL"
+        echo "BACKEND_URL=https://$BACKEND_URL" >> $GITHUB_ENV
+
+    - name: Deploy Frontend Container App
+      run: |
+        REGISTRY_SERVER=${{ needs.deploy-infrastructure.outputs.containerRegistryLoginServer }}
+        IMAGE_TAG="dev-${{ github.sha }}"
+        
+        az containerapp create \
+          --name ${{ env.FRONTEND_APP_NAME }} \
+          --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+          --environment ${{ needs.deploy-infrastructure.outputs.environmentName }} \
+          --image $REGISTRY_SERVER/workshop-frontend:$IMAGE_TAG \
+          --registry-server $REGISTRY_SERVER \
+          --target-port 80 \
+          --ingress external \
+          --min-replicas 1 \
+          --max-replicas 3 \
+          --cpu 0.25 \
+          --memory 0.5Gi \
+          --env-vars \
+            "REACT_APP_API_URL=${{ env.BACKEND_URL }}" \
+            "NODE_ENV=production" \
+          --tags \
+            "Environment=Development" \
+            "Application=Frontend" \
+            "Version=$IMAGE_TAG"
+        
+        # Get frontend URL
+        FRONTEND_URL=$(az containerapp show \
+          --name ${{ env.FRONTEND_APP_NAME }} \
+          --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+          --query 'properties.configuration.ingress.fqdn' \
+          --output tsv)
+        
+        echo "✅ Frontend deployed: https://$FRONTEND_URL"
+
+    - name: Update Backend CORS Settings
+      run: |
+        # Update backend with frontend URL for CORS
+        FRONTEND_URL=$(az containerapp show \
+          --name ${{ env.FRONTEND_APP_NAME }} \
+          --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+          --query 'properties.configuration.ingress.fqdn' \
+          --output tsv)
+        
+        az containerapp update \
+          --name ${{ env.BACKEND_APP_NAME }} \
+          --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+          --set-env-vars \
+            "CORS_ORIGIN=https://$FRONTEND_URL" \
+            "NODE_ENV=production" \
+            "DAPR_ENABLED=true" \
+            "PORT=3001"
+        
+        echo "✅ Backend CORS updated for frontend: https://$FRONTEND_URL"
+
+    - name: Deployment Summary
+      run: |
+        echo "🎉 Deployment completed successfully!"
+        echo ""
+        echo "📋 Deployment Details:"
+        echo "  • Resource Group: ${{ env.RESOURCE_GROUP_NAME }}"
+        echo "  • Environment: ${{ needs.deploy-infrastructure.outputs.environmentName }}"
+        echo "  • Location: ${{ env.LOCATION }}"
+        echo "  • Registry: ${{ needs.deploy-infrastructure.outputs.containerRegistryName }}"
+        echo ""
+        echo "🌐 Application URLs:"
+        
+        # Get final URLs
+        FRONTEND_URL=$(az containerapp show \
+          --name ${{ env.FRONTEND_APP_NAME }} \
+          --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+          --query 'properties.configuration.ingress.fqdn' \
+          --output tsv)
+        
+        BACKEND_URL=$(az containerapp show \
+          --name ${{ env.BACKEND_APP_NAME }} \
+          --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+          --query 'properties.configuration.ingress.fqdn' \
+          --output tsv)
+        
+        echo "  • Frontend: https://$FRONTEND_URL"
+        echo "  • Backend:  https://$BACKEND_URL"
+        echo "  • Backend Health: https://$BACKEND_URL/health"
+        echo ""
+        echo "🔧 Next Steps:"
+        echo "  1. Test the application endpoints"
+        echo "  2. Check container logs if needed"
+        echo "  3. Monitor application performance"

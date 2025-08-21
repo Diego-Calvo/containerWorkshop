@@ -405,6 +405,7 @@ resource frontendContainerApp 'Microsoft.App/containerApps@2023-05-01' = {
 output containerRegistryLoginServer string = containerRegistry.properties.loginServer
 output containerRegistryName string = containerRegistry.name
 output containerAppsEnvironmentName string = containerAppsEnvironment.name
+output environmentName string = containerAppsEnvironment.name
 output frontendUrl string = 'https://${frontendContainerApp.properties.configuration.ingress.fqdn}'
 output backendUrl string = 'https://${backendContainerApp.properties.configuration.ingress.fqdn}'
 output resourceGroupName string = resourceGroup().name
