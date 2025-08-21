@@ -1,33 +1,50 @@
-name: Deploy to Azure Container Apps (Dev Environment)
+name: Manual Deploy to Azure Container Apps
 
 on:
-  push:
-    branches: [ dev ]
-  pull_request:
-    branches: [ dev ]
   workflow_dispatch:
     inputs:
       resourceGroupName:
         description: 'Resource Group Name'
-        required: false
+        required: true
         default: 'containerWorkshop'
+        type: string
       location:
         description: 'Azure Region'
-        required: false
+        required: true
         default: 'eastus2'
+        type: choice
+        options:
+          - eastus2
+          - westus2
+          - centralus
+          - westeurope
+          - northeurope
+          - southeastasia
+          - australiaeast
       environmentName:
         description: 'Container Apps Environment Name'
-        required: false
+        required: true
         default: 'workshop-dev-env'
+        type: string
+      deployInfrastructure:
+        description: 'Deploy Infrastructure (uncheck if already exists)'
+        required: false
+        default: true
+        type: boolean
+      deployApplications:
+        description: 'Deploy Applications'
+        required: false
+        default: true
+        type: boolean
 
 env:
-  # Default values - can be overridden by workflow inputs or repository variables
-  RESOURCE_GROUP_NAME: ${{ github.event.inputs.resourceGroupName || vars.RESOURCE_GROUP_NAME || 'containerWorkshop' }}
-  LOCATION: ${{ github.event.inputs.location || vars.AZURE_LOCATION || 'eastus2' }}
-  ENVIRONMENT_NAME: ${{ github.event.inputs.environmentName || vars.ENVIRONMENT_NAME || 'workshop-dev-env' }}
+  # Use workflow inputs for manual deployment
+  RESOURCE_GROUP_NAME: ${{ github.event.inputs.resourceGroupName }}
+  LOCATION: ${{ github.event.inputs.location }}
+  ENVIRONMENT_NAME: ${{ github.event.inputs.environmentName }}
   
   # Container Registry will be created dynamically
-  CONTAINER_REGISTRY_NAME: ${{ vars.CONTAINER_REGISTRY_NAME || format('workshopacr{0}', github.run_number) }}
+  CONTAINER_REGISTRY_NAME: ${{ format('workshopacr{0}', github.run_number) }}
   
   # Application settings
   FRONTEND_APP_NAME: workshop-frontend-dev
@@ -37,6 +54,7 @@ jobs:
   # Infrastructure deployment job
   deploy-infrastructure:
     runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.deployInfrastructure == 'true' }}
     outputs:
       containerRegistryName: ${{ steps.deploy.outputs.containerRegistryName }}
       containerRegistryLoginServer: ${{ steps.deploy.outputs.containerRegistryLoginServer }}
@@ -95,7 +113,10 @@ jobs:
   # Application deployment job
   deploy-applications:
     runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.deployApplications == 'true' }}
     needs: deploy-infrastructure
+    # Run this job even if infrastructure deployment was skipped
+    # but only if deployApplications is true
     
     steps:
     - name: Checkout repository
@@ -106,14 +127,50 @@ jobs:
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+    - name: Get Existing Infrastructure Info
+      id: get-existing
+      if: ${{ github.event.inputs.deployInfrastructure == 'false' }}
+      run: |
+        # Get existing container registry
+        REGISTRY_INFO=$(az acr list --resource-group ${{ env.RESOURCE_GROUP_NAME }} --query '[0]' --output json)
+        REGISTRY_NAME=$(echo $REGISTRY_INFO | jq -r '.name')
+        REGISTRY_LOGIN_SERVER=$(echo $REGISTRY_INFO | jq -r '.loginServer')
+        
+        # Get existing environment
+        ENV_INFO=$(az containerapp env list --resource-group ${{ env.RESOURCE_GROUP_NAME }} --query '[0]' --output json)
+        ENV_NAME=$(echo $ENV_INFO | jq -r '.name')
+        
+        # Set outputs
+        echo "containerRegistryName=$REGISTRY_NAME" >> $GITHUB_OUTPUT
+        echo "containerRegistryLoginServer=$REGISTRY_LOGIN_SERVER" >> $GITHUB_OUTPUT
+        echo "environmentName=$ENV_NAME" >> $GITHUB_OUTPUT
+        
+        echo "✅ Found existing infrastructure"
+        echo "📦 Container Registry: $REGISTRY_NAME"
+        echo "🌐 Login Server: $REGISTRY_LOGIN_SERVER"
+        echo "🏗️ Environment: $ENV_NAME"
+
     - name: Login to Container Registry
       run: |
-        az acr login --name ${{ needs.deploy-infrastructure.outputs.containerRegistryName }}
+        # Get registry name from either infrastructure deployment or existing infrastructure
+        if [ "${{ github.event.inputs.deployInfrastructure }}" == "true" ]; then
+          REGISTRY_NAME="${{ needs.deploy-infrastructure.outputs.containerRegistryName }}"
+        else
+          REGISTRY_NAME="${{ steps.get-existing.outputs.containerRegistryName }}"
+        fi
+        
+        az acr login --name $REGISTRY_NAME
 
     - name: Build and Push Frontend Container
       run: |
-        REGISTRY_SERVER=${{ needs.deploy-infrastructure.outputs.containerRegistryLoginServer }}
-        IMAGE_TAG="dev-${{ github.sha }}"
+        # Get registry server from either infrastructure deployment or existing infrastructure
+        if [ "${{ github.event.inputs.deployInfrastructure }}" == "true" ]; then
+          REGISTRY_SERVER="${{ needs.deploy-infrastructure.outputs.containerRegistryLoginServer }}"
+        else
+          REGISTRY_SERVER="${{ steps.get-existing.outputs.containerRegistryLoginServer }}"
+        fi
+        
+        IMAGE_TAG="manual-${{ github.sha }}"
         
         # Build frontend image
         docker build -t $REGISTRY_SERVER/workshop-frontend:$IMAGE_TAG \
@@ -128,8 +185,14 @@ jobs:
 
     - name: Build and Push Backend Container
       run: |
-        REGISTRY_SERVER=${{ needs.deploy-infrastructure.outputs.containerRegistryLoginServer }}
-        IMAGE_TAG="dev-${{ github.sha }}"
+        # Get registry server from either infrastructure deployment or existing infrastructure
+        if [ "${{ github.event.inputs.deployInfrastructure }}" == "true" ]; then
+          REGISTRY_SERVER="${{ needs.deploy-infrastructure.outputs.containerRegistryLoginServer }}"
+        else
+          REGISTRY_SERVER="${{ steps.get-existing.outputs.containerRegistryLoginServer }}"
+        fi
+        
+        IMAGE_TAG="manual-${{ github.sha }}"
         
         # Build backend image
         docker build -t $REGISTRY_SERVER/workshop-backend:$IMAGE_TAG \

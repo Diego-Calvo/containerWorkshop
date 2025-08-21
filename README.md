@@ -6,10 +6,10 @@ A comprehensive hands-on workshop for Azure Container Apps featuring a modern tw
 
 🎨 **Modern React Frontend**
 - Glass morphism design with smooth animations
-- Real-time statistics dashboard
-- Auto-refresh functionality (10-second intervals)
+- Real-time network activity visualization dashboard
+- Container communication tracking and display
 - Interactive filtering and CRUD operations
-- Mobile-responsive design
+- Mobile-responsive design with auto-refresh
 
 🚀 **High-Performance Backend**
 - Node.js Express API with DAPR integration
@@ -20,9 +20,44 @@ A comprehensive hands-on workshop for Azure Container Apps featuring a modern tw
 
 ⚡ **Performance Optimized**
 - Sub-100ms API response times
-- Efficient container orchestration
+- Efficient container orchestration with network visualization
 - CORS properly configured
 - Production-ready Docker setup
+
+🎯 **Workshop Learning Goals**
+- Hands-on Azure Container Apps deployment
+- GitHub Actions manual deployment workflow
+- Infrastructure as Code with Bicep templates
+- DAPR microservices communication
+- Container networking and monitoring
+
+## 🚀 Quick Start for Workshop Participants
+
+### **Option 1: Manual Deployment (Recommended for Learning)**
+📚 **[Follow the Complete Manual Deployment Guide](./MANUAL_DEPLOYMENT_GUIDE.md)**
+
+**Quick Summary:**
+1. Fork this repository
+2. Create Azure Service Principal
+3. Add GitHub secret: `AZURE_CREDENTIALS`
+4. Run workflow: "Manual Deploy to Azure Container Apps"
+5. Test your deployed application!
+
+### **Option 2: Local Development**
+```bash
+# Clone and start locally
+git clone https://github.com/YOUR-USERNAME/containerWorkshop
+cd containerWorkshop
+docker-compose up --build
+```
+- Frontend: http://localhost:3000
+- Backend: http://localhost:3001
+
+## 📚 Documentation
+
+- 📖 **[Manual Deployment Guide](./MANUAL_DEPLOYMENT_GUIDE.md)** - Step-by-step workshop instructions
+- 🏗️ **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Advanced deployment options and configuration
+- 📋 **[Workshop Guide](./docs/workshop-guide.md)** - Detailed DAPR components and prerequisites
 
 ## 🏗️ Architecture Overview
 
