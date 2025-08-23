@@ -71,9 +71,30 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Azure CLI Login
-      uses: azure/login@v1
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
+      run: |
+        # Create temporary certificate file from secret
+        echo '${{ secrets.AZURE_CREDENTIALS }}' > azure_creds.json
+        
+        # Extract certificate content and save to file
+        cat azure_creds.json | jq -r '.clientCertificate' > client_cert.pem
+        
+        # Extract other credentials
+        CLIENT_ID=$(cat azure_creds.json | jq -r '.clientId')
+        TENANT_ID=$(cat azure_creds.json | jq -r '.tenantId')
+        SUBSCRIPTION_ID=$(cat azure_creds.json | jq -r '.subscriptionId')
+        
+        # Login with certificate
+        az login --service-principal \
+          --username $CLIENT_ID \
+          --tenant $TENANT_ID \
+          --password client_cert.pem
+        
+        # Set default subscription
+        az account set --subscription $SUBSCRIPTION_ID
+        
+        # Clean up certificate file
+        rm -f client_cert.pem azure_creds.json
+      shell: bash
 
     - name: Create Resource Group
       run: |
@@ -128,9 +149,30 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Azure CLI Login
-      uses: azure/login@v1
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
+      run: |
+        # Create temporary certificate file from secret
+        echo '${{ secrets.AZURE_CREDENTIALS }}' > azure_creds.json
+        
+        # Extract certificate content and save to file
+        cat azure_creds.json | jq -r '.clientCertificate' > client_cert.pem
+        
+        # Extract other credentials
+        CLIENT_ID=$(cat azure_creds.json | jq -r '.clientId')
+        TENANT_ID=$(cat azure_creds.json | jq -r '.tenantId')
+        SUBSCRIPTION_ID=$(cat azure_creds.json | jq -r '.subscriptionId')
+        
+        # Login with certificate
+        az login --service-principal \
+          --username $CLIENT_ID \
+          --tenant $TENANT_ID \
+          --password client_cert.pem
+        
+        # Set default subscription
+        az account set --subscription $SUBSCRIPTION_ID
+        
+        # Clean up certificate file
+        rm -f client_cert.pem azure_creds.json
+      shell: bash
 
     - name: Get Existing Infrastructure Info
       id: get-existing

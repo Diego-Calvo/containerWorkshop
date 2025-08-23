@@ -119,11 +119,15 @@ The project supports easy customization through:
 - Deployment failures: Check Azure quotas and resource naming conflicts
 - Local development issues: Ensure Docker and DAPR CLI are properly installed
 - **Service Principal Policy Errors**: "CredentialInvalidLifetimeAsPerAppPolicy" indicates restrictive organizational policies on credential lifetime
-  - Solution 1: Add `--years 1` parameter to service principal creation commands
-  - Solution 2: Try without `--years` parameter for minimal duration if organization policy is very restrictive
-  - Solution 3: Contact Azure administrator to create SP or adjust policy
-  - Solution 4: Use personal Azure subscription without restrictions
-  - Solution 5: Implement GitHub OIDC for enterprise scenarios
+  - **Root Cause**: App Management Policies restrict credential lifetime to maximum 367 days (P367D) for password, symmetric key, and asymmetric key credentials
+  - **Policy Investigation**: Use `az rest --method GET --url "https://graph.microsoft.com/v1.0/policies/appManagementPolicies"` to view specific restrictions
+  - Solution 1: **Admin-assisted setup** - Ask Azure administrator to create service principal with approved credentials
+  - Solution 2: Add `--years 1` parameter to service principal creation commands
+  - Solution 3: Try without `--years` parameter for minimal duration if organization policy is very restrictive
+  - Solution 4: Use personal Azure subscription without organizational restrictions
+  - Solution 5: Implement **GitHub OIDC** for enterprise scenarios (eliminates long-lived secrets)
+  - Solution 6: **Browser-based workshop** using GitHub Codespaces or Azure Cloud Shell
+  - **Enterprise Preference**: GitHub OIDC > Admin-assisted > Personal subscription > Minimal duration
 - **PowerShell Command Failures**: Ensure commands use proper PowerShell syntax with backticks (`) for line continuations, never backslashes (\)
 
 ## Security Considerations
