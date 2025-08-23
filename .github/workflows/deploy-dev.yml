@@ -108,8 +108,9 @@ jobs:
         # Set default subscription
         az account set --subscription "$SUBSCRIPTION_ID"
         
-        # Clean up certificate file
-        rm -f client_cert.pem azure_creds.json
+        # Note: Keep certificate file for subsequent Azure CLI commands
+        # Will be cleaned up at the end of the job
+        rm -f azure_creds.json  # Remove credentials JSON but keep cert file
       shell: bash
 
     - name: Create Resource Group
@@ -152,6 +153,13 @@ jobs:
         echo "📦 Container Registry: $REGISTRY_NAME"
         echo "🌐 Login Server: $REGISTRY_LOGIN_SERVER"
         echo "🏗️ Environment: $ENV_NAME"
+
+    - name: Cleanup Certificate Files
+      if: always()
+      run: |
+        # Clean up certificate files at the end of the job
+        rm -f client_cert.pem azure_creds.json
+      shell: bash
 
   # Application deployment job
   deploy-applications:
@@ -202,8 +210,9 @@ jobs:
         # Set default subscription
         az account set --subscription "$SUBSCRIPTION_ID"
         
-        # Clean up certificate file
-        rm -f client_cert.pem azure_creds.json
+        # Note: Keep certificate file for subsequent Azure CLI commands
+        # Will be cleaned up at the end of the job
+        rm -f azure_creds.json  # Remove credentials JSON but keep cert file
       shell: bash
 
     - name: Get Existing Infrastructure Info
@@ -426,3 +435,10 @@ jobs:
         echo "  1. Test the application endpoints"
         echo "  2. Check container logs if needed"
         echo "  3. Monitor application performance"
+
+    - name: Cleanup Certificate Files
+      if: always()
+      run: |
+        # Clean up certificate files at the end of the job
+        rm -f client_cert.pem azure_creds.json
+      shell: bash
