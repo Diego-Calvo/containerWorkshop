@@ -1,16 +1,18 @@
-name: Manual Deploy to Azure Container Apps
+name: Deploy to Azure Container Apps
 
 on:
+  push:
+    branches: [ dev ]
   workflow_dispatch:
     inputs:
       resourceGroupName:
         description: 'Resource Group Name'
-        required: true
+        required: false
         default: 'containerWorkshop'
         type: string
       location:
         description: 'Azure Region'
-        required: true
+        required: false
         default: 'eastus2'
         type: choice
         options:
@@ -23,7 +25,7 @@ on:
           - australiaeast
       environmentName:
         description: 'Container Apps Environment Name'
-        required: true
+        required: false
         default: 'workshop-dev-env'
         type: string
       deployInfrastructure:
@@ -38,23 +40,27 @@ on:
         type: boolean
 
 env:
-  # Use workflow inputs for manual deployment
-  RESOURCE_GROUP_NAME: ${{ github.event.inputs.resourceGroupName }}
-  LOCATION: ${{ github.event.inputs.location }}
-  ENVIRONMENT_NAME: ${{ github.event.inputs.environmentName }}
+  # Use workflow inputs for manual deployment, or repository variables/defaults for automatic deployment
+  RESOURCE_GROUP_NAME: ${{ github.event.inputs.resourceGroupName || vars.RESOURCE_GROUP_NAME || 'containerWorkshop' }}
+  LOCATION: ${{ github.event.inputs.location || vars.AZURE_LOCATION || 'eastus2' }}
+  ENVIRONMENT_NAME: ${{ github.event.inputs.environmentName || vars.ENVIRONMENT_NAME || 'workshop-dev-env' }}
   
   # Container Registry will be created dynamically
-  CONTAINER_REGISTRY_NAME: ${{ format('workshopacr{0}', github.run_number) }}
+  CONTAINER_REGISTRY_NAME: ${{ vars.CONTAINER_REGISTRY_NAME || format('workshopacr{0}', github.run_number) }}
   
   # Application settings
   FRONTEND_APP_NAME: workshop-frontend-dev
   BACKEND_APP_NAME: workshop-backend-dev
+  
+  # Deployment flags (default to true for automatic deployments)
+  DEPLOY_INFRASTRUCTURE: ${{ github.event.inputs.deployInfrastructure || 'true' }}
+  DEPLOY_APPLICATIONS: ${{ github.event.inputs.deployApplications || 'true' }}
 
 jobs:
   # Infrastructure deployment job
   deploy-infrastructure:
     runs-on: ubuntu-latest
-    if: ${{ github.event.inputs.deployInfrastructure == 'true' }}
+    if: ${{ github.event.inputs.deployInfrastructure != 'false' }}
     outputs:
       containerRegistryName: ${{ steps.deploy.outputs.containerRegistryName }}
       containerRegistryLoginServer: ${{ steps.deploy.outputs.containerRegistryLoginServer }}
@@ -113,10 +119,9 @@ jobs:
   # Application deployment job
   deploy-applications:
     runs-on: ubuntu-latest
-    if: ${{ github.event.inputs.deployApplications == 'true' }}
+    if: ${{ github.event.inputs.deployApplications != 'false' }}
     needs: deploy-infrastructure
-    # Run this job even if infrastructure deployment was skipped
-    # but only if deployApplications is true
+    # Continue even if infrastructure deployment was skipped
     
     steps:
     - name: Checkout repository
@@ -129,7 +134,7 @@ jobs:
 
     - name: Get Existing Infrastructure Info
       id: get-existing
-      if: ${{ github.event.inputs.deployInfrastructure == 'false' }}
+      if: ${{ github.event.inputs.deployInfrastructure == 'false' || needs.deploy-infrastructure.result == 'skipped' }}
       run: |
         # Get existing container registry
         REGISTRY_INFO=$(az acr list --resource-group ${{ env.RESOURCE_GROUP_NAME }} --query '[0]' --output json)
@@ -153,7 +158,7 @@ jobs:
     - name: Login to Container Registry
       run: |
         # Get registry name from either infrastructure deployment or existing infrastructure
-        if [ "${{ github.event.inputs.deployInfrastructure }}" == "true" ]; then
+        if [ "${{ needs.deploy-infrastructure.result }}" == "success" ]; then
           REGISTRY_NAME="${{ needs.deploy-infrastructure.outputs.containerRegistryName }}"
         else
           REGISTRY_NAME="${{ steps.get-existing.outputs.containerRegistryName }}"
@@ -164,13 +169,13 @@ jobs:
     - name: Build and Push Frontend Container
       run: |
         # Get registry server from either infrastructure deployment or existing infrastructure
-        if [ "${{ github.event.inputs.deployInfrastructure }}" == "true" ]; then
+        if [ "${{ needs.deploy-infrastructure.result }}" == "success" ]; then
           REGISTRY_SERVER="${{ needs.deploy-infrastructure.outputs.containerRegistryLoginServer }}"
         else
           REGISTRY_SERVER="${{ steps.get-existing.outputs.containerRegistryLoginServer }}"
         fi
         
-        IMAGE_TAG="manual-${{ github.sha }}"
+        IMAGE_TAG="dev-${{ github.sha }}"
         
         # Build frontend image
         docker build -t $REGISTRY_SERVER/workshop-frontend:$IMAGE_TAG \
@@ -186,13 +191,13 @@ jobs:
     - name: Build and Push Backend Container
       run: |
         # Get registry server from either infrastructure deployment or existing infrastructure
-        if [ "${{ github.event.inputs.deployInfrastructure }}" == "true" ]; then
+        if [ "${{ needs.deploy-infrastructure.result }}" == "success" ]; then
           REGISTRY_SERVER="${{ needs.deploy-infrastructure.outputs.containerRegistryLoginServer }}"
         else
           REGISTRY_SERVER="${{ steps.get-existing.outputs.containerRegistryLoginServer }}"
         fi
         
-        IMAGE_TAG="manual-${{ github.sha }}"
+        IMAGE_TAG="dev-${{ github.sha }}"
         
         # Build backend image
         docker build -t $REGISTRY_SERVER/workshop-backend:$IMAGE_TAG \
@@ -207,13 +212,21 @@ jobs:
 
     - name: Deploy Backend Container App
       run: |
-        REGISTRY_SERVER=${{ needs.deploy-infrastructure.outputs.containerRegistryLoginServer }}
+        # Get registry server and environment from either infrastructure deployment or existing infrastructure
+        if [ "${{ needs.deploy-infrastructure.result }}" == "success" ]; then
+          REGISTRY_SERVER="${{ needs.deploy-infrastructure.outputs.containerRegistryLoginServer }}"
+          ENV_NAME="${{ needs.deploy-infrastructure.outputs.environmentName }}"
+        else
+          REGISTRY_SERVER="${{ steps.get-existing.outputs.containerRegistryLoginServer }}"
+          ENV_NAME="${{ steps.get-existing.outputs.environmentName }}"
+        fi
+        
         IMAGE_TAG="dev-${{ github.sha }}"
         
         az containerapp create \
           --name ${{ env.BACKEND_APP_NAME }} \
           --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
-          --environment ${{ needs.deploy-infrastructure.outputs.environmentName }} \
+          --environment $ENV_NAME \
           --image $REGISTRY_SERVER/workshop-backend:$IMAGE_TAG \
           --registry-server $REGISTRY_SERVER \
           --target-port 3001 \
@@ -246,13 +259,21 @@ jobs:
 
     - name: Deploy Frontend Container App
       run: |
-        REGISTRY_SERVER=${{ needs.deploy-infrastructure.outputs.containerRegistryLoginServer }}
+        # Get registry server and environment from either infrastructure deployment or existing infrastructure
+        if [ "${{ needs.deploy-infrastructure.result }}" == "success" ]; then
+          REGISTRY_SERVER="${{ needs.deploy-infrastructure.outputs.containerRegistryLoginServer }}"
+          ENV_NAME="${{ needs.deploy-infrastructure.outputs.environmentName }}"
+        else
+          REGISTRY_SERVER="${{ steps.get-existing.outputs.containerRegistryLoginServer }}"
+          ENV_NAME="${{ steps.get-existing.outputs.environmentName }}"
+        fi
+        
         IMAGE_TAG="dev-${{ github.sha }}"
         
         az containerapp create \
           --name ${{ env.FRONTEND_APP_NAME }} \
           --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
-          --environment ${{ needs.deploy-infrastructure.outputs.environmentName }} \
+          --environment $ENV_NAME \
           --image $REGISTRY_SERVER/workshop-frontend:$IMAGE_TAG \
           --registry-server $REGISTRY_SERVER \
           --target-port 80 \
@@ -262,7 +283,7 @@ jobs:
           --cpu 0.25 \
           --memory 0.5Gi \
           --env-vars \
-            "REACT_APP_API_URL=${{ env.BACKEND_URL }}" \
+            "REACT_APP_API_URL=$BACKEND_URL" \
             "NODE_ENV=production" \
           --tags \
             "Environment=Development" \

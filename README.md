@@ -36,17 +36,43 @@ A comprehensive hands-on workshop for Azure Container Apps featuring a modern tw
 ### **Option 1: Manual Deployment (Recommended for Learning)**
 📚 **[Follow the Complete Manual Deployment Guide](./MANUAL_DEPLOYMENT_GUIDE.md)**
 
-**Quick Summary:**
-1. Fork this repository
-2. Create Azure Service Principal
-3. Add GitHub secret: `AZURE_CREDENTIALS`
-4. Run workflow: "Manual Deploy to Azure Container Apps"
-5. Test your deployed application!
+## 🚀 Deployment Options
 
-### **Option 2: Local Development**
+### **🎯 Automatic Deployment (Default)**
+The workshop automatically deploys to Azure when you push to the `dev` branch:
+
+1. **Fork this repository**
+2. **Add Azure credentials** to GitHub Secrets (see guides below)
+3. **Push to dev branch** → Automatic deployment to `containerWorkshop` resource group
+
+### **⚙️ Custom Deployment for Your Organization**
+📚 **[Customization Guide](./CUSTOMIZATION_GUIDE.md)** - Deploy to your own Azure subscription and resource groups
+
+**Quick customization options:**
+- **Repository Variables**: Set once, use everywhere
+- **Manual Workflow**: Override per deployment  
+- **Fork and Modify**: Change defaults for your organization
+
+### **📚 Workshop Labs (Instructor-Led)**
+For structured learning experiences:
+
+#### **🏗️ [Lab Part 1: Infrastructure Deployment](./docs/lab_part1.md)**
+**Duration**: ~10-15 minutes
+- Clone repository and setup Azure CLI
+- Deploy Container Apps infrastructure using Bicep
+- Verify environment and DAPR components
+
+#### **🚀 [Lab Part 2: Application Deployment & CI/CD](./docs/lab_part2.md)**
+**Duration**: ~30-45 minutes  
+- Fork repository and configure GitHub Actions
+- Deploy containerized applications via manual workflow
+- Make code changes and redeploy
+- Monitor and scale applications
+
+### **💻 Local Development Only**
 ```bash
 # Clone and start locally
-git clone https://github.com/YOUR-USERNAME/containerWorkshop
+git clone https://github.com/Diego-Calvo/containerWorkshop
 cd containerWorkshop
 docker-compose up --build
 ```
@@ -55,9 +81,23 @@ docker-compose up --build
 
 ## 📚 Documentation
 
-- 📖 **[Manual Deployment Guide](./MANUAL_DEPLOYMENT_GUIDE.md)** - Step-by-step workshop instructions
+- � **[Customization Guide](./CUSTOMIZATION_GUIDE.md)** - Deploy to your own Azure subscription
+- 📖 **[Lab Part 1](./docs/lab_part1.md)** - Infrastructure deployment with Bicep
+- 🚀 **[Lab Part 2](./docs/lab_part2.md)** - Application deployment and CI/CD
 - 🏗️ **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Advanced deployment options and configuration
-- 📋 **[Workshop Guide](./docs/workshop-guide.md)** - Detailed DAPR components and prerequisites
+
+### **⚡ Quick Azure Setup**
+```bash
+# Create Azure Service Principal for GitHub Actions
+az ad sp create-for-rbac \
+  --name "containerWorkshop-github" \
+  --role contributor \
+  --scopes /subscriptions/YOUR-SUBSCRIPTION-ID \
+  --sdk-auth
+
+# Add the JSON output as GitHub Secret: AZURE_CREDENTIALS
+# Then push to dev branch for automatic deployment!
+```
 
 ## 🏗️ Architecture Overview
 
