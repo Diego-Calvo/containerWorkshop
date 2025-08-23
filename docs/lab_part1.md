@@ -1,96 +1,98 @@
-# Lab Part 1: Infrastructure Deployment
+# Lab Part 1: Infrastructure Deployment via GitHub Actions
 
 ## 🎯 **Objective**
-Deploy Azure Container Apps infrastructure using Bicep templates via local Azure CLI commands.
+Deploy Azure Container Apps infrastructure using GitHub Actions after forking the repository.
 
 ---
 
 ## 📋 **Prerequisites** 
-- **Azure CLI** installed and updated
+- **GitHub account**
 - **Azure Subscription** with Contributor permissions
-- **Git** installed
-- **PowerShell 7+** (recommended)
-
-**Verify Prerequisites:**
-```powershell
-az --version          # Should show 2.60.0+
-git --version         # Any recent version
-$PSVersionTable.PSVersion  # Should show 7.0+
-```
+- **Web browser** (no local tools required!)
 
 ---
 
 ## 🚀 **Lab Steps**
 
-### **Step 1: Clone Repository**
+### **Step 1: Fork Repository**
+1. **Navigate to**: https://github.com/Diego-Calvo/containerWorkshop
+2. **Click "Fork"** in the top-right corner
+3. **Select your GitHub account** as the destination
+4. **Wait for fork to complete**
+
+### **Step 2: Create Azure Service Principal**
+You'll need Azure CLI for this one step. If you don't have it locally, use Azure Cloud Shell:
+
+**Option A: Azure Cloud Shell (Recommended)**
+1. **Go to**: https://shell.azure.com
+2. **Select Bash or PowerShell**
+3. **Run the following commands**:
+
 ```bash
-# Clone the workshop repository
-git clone https://github.com/Diego-Calvo/containerWorkshop.git
-cd containerWorkshop
+# Create service principal for GitHub Actions
+az ad sp create-for-rbac \
+  --name "containerWorkshop-github-$(whoami)" \
+  --role contributor \
+  --scopes /subscriptions/$(az account show --query id -o tsv) \
+  --sdk-auth
 ```
 
-### **Step 2: Azure Login & Subscription**
-```powershell
+**Option B: Local Azure CLI**
+```bash
 # Login to Azure
 az login
 
-# Set your subscription
-az account set --subscription "YOUR-SUBSCRIPTION-ID"
-
-# Verify subscription
-az account show --query "name"
+# Create service principal
+az ad sp create-for-rbac \
+  --name "containerWorkshop-github" \
+  --role contributor \
+  --scopes /subscriptions/YOUR-SUBSCRIPTION-ID \
+  --sdk-auth
 ```
 
-### **Step 3: Configure Deployment Parameters**
-```powershell
-# Edit the parameters file or use defaults
-# File: infrastructure/bicep/main.parameters.dev.json
+**📝 Important**: Copy the entire JSON output!
 
-# Default values:
-# - resourceGroupName: "containerWorkshop"  
-# - location: "eastus2"
-# - environmentName: "workshop-dev-env"
-# - containerRegistryName: "workshopacr" + random suffix
-```
+### **Step 3: Configure GitHub Repository Secret**
+1. **Go to your forked repository** on GitHub
+2. **Click "Settings"** → **"Secrets and variables"** → **"Actions"**
+3. **Click "New repository secret"**
+4. **Name**: `AZURE_CREDENTIALS`
+5. **Value**: Paste the complete JSON from Step 2
+6. **Click "Add secret"**
 
-### **Step 4: Deploy Infrastructure**
-```powershell
-# Navigate to infrastructure directory
-cd infrastructure
+### **Step 4: Deploy Infrastructure via GitHub Actions**
+1. **Go to "Actions" tab** in your forked repository
+2. **Select**: "Deploy to Azure Container Apps"
+3. **Click "Run workflow"**
+4. **Configure parameters**:
+   ```yaml
+   Resource Group Name: containerWorkshop-[yourname]
+   Azure Region: eastus2
+   Environment Name: workshop-dev-env
+   Deploy Infrastructure: ✅ true
+   Deploy Applications: ❌ false (Part 2)
+   ```
+5. **Click "Run workflow"**
 
-# Run deployment script
-../scripts/deploy-infrastructure.ps1 -ResourceGroupName "containerWorkshop" -Location "eastus2"
-
-# OR deploy manually with Azure CLI
-az deployment sub create \
-  --location "eastus2" \
-  --template-file "bicep/main.bicep" \
-  --parameters "@bicep/main.parameters.dev.json"
-```
-
-### **Step 5: Verify Deployment**
-```powershell
-# Check resource group
-az group show --name "containerWorkshop"
-
-# List deployed resources  
-az resource list --resource-group "containerWorkshop" --output table
-
-# Verify Container Apps Environment
-az containerapp env list --resource-group "containerWorkshop" --output table
-```
+### **Step 5: Monitor Deployment**
+- **Watch the workflow progress** (~5-8 minutes)
+- **Green checkmarks** indicate successful deployment
+- **Click on the workflow** to see detailed logs
 
 ---
 
 ## ✅ **Expected Results**
 
-After successful deployment, you should see:
-- **Resource Group**: `containerWorkshop`
-- **Container Apps Environment**: `workshop-dev-env`  
-- **Container Registry**: `workshopacr[random]`
-- **Log Analytics Workspace**
-- **Application Insights**
-- **Cosmos DB Account** (for DAPR state store)
+After successful deployment, you should see in the workflow output:
+- **✅ Resource Group Created**: `containerWorkshop-[yourname]`
+- **✅ Container Apps Environment**: `workshop-dev-env`  
+- **✅ Container Registry**: `workshopacr[random]`
+- **✅ Supporting Services**: Log Analytics, Application Insights, Cosmos DB
+
+### **Verify in Azure Portal**
+1. **Login to**: https://portal.azure.com
+2. **Navigate to**: Your resource group
+3. **Confirm resources** match the table below
 
 ---
 
@@ -107,8 +109,29 @@ After successful deployment, you should see:
 ---
 
 ## 🎯 **Next Steps**
-- Proceed to **Lab Part 2** for application deployment
-- Infrastructure is now ready for container applications
-- DAPR components are pre-configured
+- **✅ Infrastructure deployed successfully!**
+- **Proceed to [Lab Part 2](./lab_part2.md)** for application deployment
+- **No local tools needed** for the rest of the workshop
+
+---
+
+## 🛠️ **Troubleshooting**
+
+### **Issue**: "Azure CLI Login Failed"
+**Solution**: Verify your `AZURE_CREDENTIALS` secret format matches:
+```json
+{
+  "clientId": "00000000-0000-0000-0000-000000000000",
+  "clientSecret": "your-secret-here",
+  "subscriptionId": "00000000-0000-0000-0000-000000000000",
+  "tenantId": "00000000-0000-0000-0000-000000000000"
+}
+```
+
+### **Issue**: "Resource Group Already Exists"
+**Solution**: Use a different resource group name or delete the existing one
+
+### **Issue**: "Workflow Permission Denied"
+**Solution**: Ensure you're in your forked repository (not the original)
 
 **⏱️ Lab Duration**: ~10-15 minutes

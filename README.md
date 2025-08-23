@@ -31,45 +31,50 @@ A comprehensive hands-on workshop for Azure Container Apps featuring a modern tw
 - DAPR microservices communication
 - Container networking and monitoring
 
-## 🚀 Quick Start for Workshop Participants
+## � **Workshop Labs** (No Local Tools Required!)
 
-### **Option 1: Manual Deployment (Recommended for Learning)**
-📚 **[Follow the Complete Manual Deployment Guide](./MANUAL_DEPLOYMENT_GUIDE.md)**
+### **🏗️ [Lab Part 1: Infrastructure Deployment](./docs/lab_part1.md)**
+**Duration**: ~10-15 minutes | **Requirements**: GitHub account + Azure subscription
+- Fork repository and configure Azure credentials
+- Deploy Container Apps infrastructure via GitHub Actions
+- Verify environment setup in Azure Portal
 
-## 🚀 Deployment Options
+### **🚀 [Lab Part 2: Application Deployment & Live Updates](./docs/lab_part2.md)**
+**Duration**: ~30-45 minutes | **Requirements**: Lab Part 1 completed  
+- Deploy containerized applications via GitHub Actions
+- Make live code changes through GitHub web interface
+- Experience automatic redeployment and zero-downtime updates
 
-### **🎯 Automatic Deployment (Default)**
-The workshop automatically deploys to Azure when you push to the `dev` branch:
+## 🚀 Quick Start Options
 
-1. **Fork this repository**
-2. **Add Azure credentials** to GitHub Secrets (see guides below)
-3. **Push to dev branch** → Automatic deployment to `containerWorkshop` resource group
+### **🎓 Workshop Participant Path (Recommended)**
+**No local tools required - everything via web browser!**
+1. **Fork repository** on GitHub
+2. **Follow [Lab Part 1](./docs/lab_part1.md)** for infrastructure
+3. **Follow [Lab Part 2](./docs/lab_part2.md)** for applications
+4. **Experience live updates** through GitHub web interface
 
-### **⚙️ Custom Deployment for Your Organization**
-📚 **[Customization Guide](./CUSTOMIZATION_GUIDE.md)** - Deploy to your own Azure subscription and resource groups
+### **🔧 Developer/Advanced Path**
+For local development and advanced scenarios:
+```bash
+# Local development setup
+git clone https://github.com/YOUR-USERNAME/containerWorkshop
+cd containerWorkshop
+docker-compose up --build
+```
+- Frontend: http://localhost:3000
+- Backend: http://localhost:3001
+
+### **🏢 Organization Deployment**
+📚 **[Customization Guide](./CUSTOMIZATION_GUIDE.md)** - Deploy to your own Azure subscription and resource groups with custom naming
 
 **Quick customization options:**
 - **Repository Variables**: Set once, use everywhere
 - **Manual Workflow**: Override per deployment  
 - **Fork and Modify**: Change defaults for your organization
 
-### **📚 Workshop Labs (Instructor-Led)**
-For structured learning experiences:
-
-#### **🏗️ [Lab Part 1: Infrastructure Deployment](./docs/lab_part1.md)**
-**Duration**: ~10-15 minutes
-- Clone repository and setup Azure CLI
-- Deploy Container Apps infrastructure using Bicep
-- Verify environment and DAPR components
-
-#### **🚀 [Lab Part 2: Application Deployment & CI/CD](./docs/lab_part2.md)**
-**Duration**: ~30-45 minutes  
-- Fork repository and configure GitHub Actions
-- Deploy containerized applications via manual workflow
-- Make code changes and redeploy
-- Monitor and scale applications
-
-### **💻 Local Development Only**
+### **� Local Development Only**
+For advanced users who want to run locally:
 ```bash
 # Clone and start locally
 git clone https://github.com/Diego-Calvo/containerWorkshop
