@@ -34,8 +34,7 @@ az ad sp create-for-rbac `
   --name "containerWorkshop-github-$(whoami)" `
   --role contributor `
   --scopes /subscriptions/$(az account show --query id -o tsv) `
-  --years 1 `
-  --json-auth
+  --years 1
 ```
 
 **Option B: Local Azure CLI**
@@ -48,22 +47,30 @@ az ad sp create-for-rbac `
   --name "containerWorkshop-github" `
   --role contributor `
   --scopes /subscriptions/YOUR-SUBSCRIPTION-ID `
-  --years 1 `
-  --json-auth
+  --years 1
 ```
 
-**⚠️ If you get a "CredentialInvalidLifetimeAsPerAppPolicy" or "policy" error**, try this alternative:
+**⚠️ If you get a "CredentialInvalidLifetimeAsPerAppPolicy" error (very restrictive policies):**
+
+**Step 1: Try without --years parameter (uses minimal duration)**
 ```powershell
-# For restrictive tenant policies - try shorter credential lifetime
 az ad sp create-for-rbac `
   --name "containerWorkshop-github" `
   --role contributor `
-  --scopes /subscriptions/$(az account show --query id -o tsv) `
-  --years 1
-
-# If 1 year still fails, try 6 months or 3 months
-# --years 0 (uses default shorter duration)
+  --scopes /subscriptions/$(az account show --query id -o tsv)
 ```
+
+**Step 2: If still fails, contact your Azure Administrator**
+```text
+Your organization has an extremely restrictive policy.
+Ask your Azure admin to:
+1. Create the service principal for you with appropriate lifetime
+2. Provide the credentials in the required JSON format
+3. Or temporarily adjust the policy for workshop purposes
+```
+
+**Step 3: Alternative - Use different Azure subscription**
+If you have access to a personal Azure subscription or a less restrictive organizational subscription, try using that instead.
 
 **📝 Important**: Copy the entire JSON output!
 
@@ -75,22 +82,27 @@ If you encounter **"CredentialInvalidLifetimeAsPerAppPolicy"** error:
 
 **Solution - Try Shorter Credential Lifetime:**
 ```powershell
-# Try 1 year (most common policy limit)
+# Step 1: Try 1 year
 az ad sp create-for-rbac `
   --name "containerWorkshop-github" `
   --role contributor `
   --scopes /subscriptions/YOUR-SUBSCRIPTION-ID `
-  --years 1 `
-  --json-auth
+  --years 1
 
-# If 1 year fails, try 6 months
+# Step 2: If 1 year fails, try without --years (uses shortest default)
 az ad sp create-for-rbac `
   --name "containerWorkshop-github" `
   --role contributor `
-  --scopes /subscriptions/YOUR-SUBSCRIPTION-ID `
-  --years 0 `
-  --json-auth
+  --scopes /subscriptions/YOUR-SUBSCRIPTION-ID
+
+# Step 3: If still fails, ask Azure admin to create SP for you
 ```
+
+**Alternative for Extremely Restrictive Policies:**
+If even the minimal duration fails, your organization requires admin intervention:
+1. **Contact Azure Administrator** - ask them to create the SP with approved credentials
+2. **Use Personal Azure Subscription** - if available and allowed
+3. **Request Policy Exception** - for workshop/training purposes
 
 **Option 1: Contact Azure Administrator**
 ```text
@@ -106,8 +118,7 @@ Contact your Azure administrator to:
 az ad sp create-for-rbac `
   --name "containerWorkshop-github" `
   --role contributor `
-  --scopes /subscriptions/YOUR-PERSONAL-SUBSCRIPTION-ID `
-  --years 1
+  --scopes /subscriptions/YOUR-PERSONAL-SUBSCRIPTION-ID
 ```
 
 **Option 3: Alternative GitHub OIDC Setup** (Advanced)
@@ -184,12 +195,12 @@ After successful deployment, you should see in the workflow output:
 
 ### **Issue**: "CredentialInvalidLifetimeAsPerAppPolicy" or "Credential lifetime exceeds the max value"
 **Root Cause**: Organization policy restricts service principal credential duration
-**Solutions**:
-1. **Add `--years 1` parameter** to use 1-year credential lifetime (most common policy limit)
-2. **Try `--years 0`** for even shorter duration if 1 year fails
-3. **Contact Azure Administrator** to create SP for you or adjust policy
-4. **Use Personal Azure Subscription** without restrictive policies
-5. **Consider GitHub OIDC** for advanced enterprise scenarios
+**Progressive Solutions**:
+1. **Try `--years 1`** - most common policy allows 1 year
+2. **Remove `--years` parameter** - uses Azure CLI default (shortest)
+3. **Contact Azure Administrator** - request SP creation or policy exception
+4. **Use Personal Azure Subscription** - if available and allowed for workshop
+5. **Consider GitHub OIDC** - for advanced enterprise scenarios (no SP needed)
 
 ### **Issue**: "Azure CLI Login Failed"
 **Solution**: Verify your `AZURE_CREDENTIALS` secret format matches:

@@ -120,7 +120,7 @@ The project supports easy customization through:
 - Local development issues: Ensure Docker and DAPR CLI are properly installed
 - **Service Principal Policy Errors**: "CredentialInvalidLifetimeAsPerAppPolicy" indicates restrictive organizational policies on credential lifetime
   - Solution 1: Add `--years 1` parameter to service principal creation commands
-  - Solution 2: Try `--years 0` for even shorter duration if organization policy is very restrictive
+  - Solution 2: Try without `--years` parameter for minimal duration if organization policy is very restrictive
   - Solution 3: Contact Azure administrator to create SP or adjust policy
   - Solution 4: Use personal Azure subscription without restrictions
   - Solution 5: Implement GitHub OIDC for enterprise scenarios
