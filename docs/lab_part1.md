@@ -34,6 +34,7 @@ az ad sp create-for-rbac `
   --name "containerWorkshop-github-$(whoami)" `
   --role contributor `
   --scopes /subscriptions/$(az account show --query id -o tsv) `
+  --years 1 `
   --json-auth
 ```
 
@@ -47,23 +48,49 @@ az ad sp create-for-rbac `
   --name "containerWorkshop-github" `
   --role contributor `
   --scopes /subscriptions/YOUR-SUBSCRIPTION-ID `
+  --years 1 `
   --json-auth
 ```
 
-**⚠️ If you get a "deprecated" or "policy" error**, try this alternative:
+**⚠️ If you get a "CredentialInvalidLifetimeAsPerAppPolicy" or "policy" error**, try this alternative:
 ```powershell
-# Alternative method without deprecated flags
+# For restrictive tenant policies - try shorter credential lifetime
 az ad sp create-for-rbac `
   --name "containerWorkshop-github" `
   --role contributor `
-  --scopes /subscriptions/$(az account show --query id -o tsv)
+  --scopes /subscriptions/$(az account show --query id -o tsv) `
+  --years 1
+
+# If 1 year still fails, try 6 months or 3 months
+# --years 0 (uses default shorter duration)
 ```
 
 **📝 Important**: Copy the entire JSON output!
 
 **🚨 Troubleshooting Service Principal Creation:**
 
-If you encounter **"Credential lifetime exceeds the max value"** error:
+If you encounter **"CredentialInvalidLifetimeAsPerAppPolicy"** error:
+
+**Root Cause**: Your tenant has an App management policy that caps the maximum lifetime for service principal credentials. The Azure CLI default credential lifetime exceeds your organization's policy limit.
+
+**Solution - Try Shorter Credential Lifetime:**
+```powershell
+# Try 1 year (most common policy limit)
+az ad sp create-for-rbac `
+  --name "containerWorkshop-github" `
+  --role contributor `
+  --scopes /subscriptions/YOUR-SUBSCRIPTION-ID `
+  --years 1 `
+  --json-auth
+
+# If 1 year fails, try 6 months
+az ad sp create-for-rbac `
+  --name "containerWorkshop-github" `
+  --role contributor `
+  --scopes /subscriptions/YOUR-SUBSCRIPTION-ID `
+  --years 0 `
+  --json-auth
+```
 
 **Option 1: Contact Azure Administrator**
 ```text
@@ -79,7 +106,8 @@ Contact your Azure administrator to:
 az ad sp create-for-rbac `
   --name "containerWorkshop-github" `
   --role contributor `
-  --scopes /subscriptions/YOUR-PERSONAL-SUBSCRIPTION-ID
+  --scopes /subscriptions/YOUR-PERSONAL-SUBSCRIPTION-ID `
+  --years 1
 ```
 
 **Option 3: Alternative GitHub OIDC Setup** (Advanced)
@@ -154,12 +182,14 @@ After successful deployment, you should see in the workflow output:
 
 ## 🛠️ **Troubleshooting**
 
-### **Issue**: "Credential lifetime exceeds the max value allowed"
+### **Issue**: "CredentialInvalidLifetimeAsPerAppPolicy" or "Credential lifetime exceeds the max value"
 **Root Cause**: Organization policy restricts service principal credential duration
 **Solutions**:
-1. **Contact Azure Administrator** to create SP for you or adjust policy
-2. **Use Personal Azure Subscription** without restrictive policies
-3. **Consider GitHub OIDC** for advanced enterprise scenarios
+1. **Add `--years 1` parameter** to use 1-year credential lifetime (most common policy limit)
+2. **Try `--years 0`** for even shorter duration if 1 year fails
+3. **Contact Azure Administrator** to create SP for you or adjust policy
+4. **Use Personal Azure Subscription** without restrictive policies
+5. **Consider GitHub OIDC** for advanced enterprise scenarios
 
 ### **Issue**: "Azure CLI Login Failed"
 **Solution**: Verify your `AZURE_CREDENTIALS` secret format matches:

@@ -97,7 +97,8 @@ docker-compose up --build
 az ad sp create-for-rbac `
   --name "containerWorkshop-github" `
   --role contributor `
-  --scopes /subscriptions/YOUR-SUBSCRIPTION-ID
+  --scopes /subscriptions/YOUR-SUBSCRIPTION-ID `
+  --years 1
 
 # Add the JSON output as GitHub Secret: AZURE_CREDENTIALS
 # Then push to dev branch for automatic deployment!

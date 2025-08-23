@@ -118,10 +118,12 @@ The project supports easy customization through:
 - Network communication issues: Verify ingress settings and service discovery
 - Deployment failures: Check Azure quotas and resource naming conflicts
 - Local development issues: Ensure Docker and DAPR CLI are properly installed
-- **Service Principal Policy Errors**: "Credential lifetime exceeds max value" indicates restrictive organizational policies
-  - Solution 1: Contact Azure administrator to create SP or adjust policy
-  - Solution 2: Use personal Azure subscription without restrictions
-  - Solution 3: Implement GitHub OIDC for enterprise scenarios
+- **Service Principal Policy Errors**: "CredentialInvalidLifetimeAsPerAppPolicy" indicates restrictive organizational policies on credential lifetime
+  - Solution 1: Add `--years 1` parameter to service principal creation commands
+  - Solution 2: Try `--years 0` for even shorter duration if organization policy is very restrictive
+  - Solution 3: Contact Azure administrator to create SP or adjust policy
+  - Solution 4: Use personal Azure subscription without restrictions
+  - Solution 5: Implement GitHub OIDC for enterprise scenarios
 - **PowerShell Command Failures**: Ensure commands use proper PowerShell syntax with backticks (`) for line continuations, never backslashes (\)
 
 ## Security Considerations
