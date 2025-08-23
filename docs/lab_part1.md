@@ -29,12 +29,12 @@ You'll need Azure CLI for this one step. If you don't have it locally, use Azure
 3. **Run the following commands**:
 
 ```bash
-# Create service principal for GitHub Actions
+# Create service principal for GitHub Actions (modern approach)
 az ad sp create-for-rbac \
   --name "containerWorkshop-github-$(whoami)" \
   --role contributor \
   --scopes /subscriptions/$(az account show --query id -o tsv) \
-  --sdk-auth
+  --json-auth
 ```
 
 **Option B: Local Azure CLI**
@@ -42,15 +42,52 @@ az ad sp create-for-rbac \
 # Login to Azure
 az login
 
-# Create service principal
+# Create service principal (replace YOUR-SUBSCRIPTION-ID with your actual subscription ID)
 az ad sp create-for-rbac \
   --name "containerWorkshop-github" \
   --role contributor \
   --scopes /subscriptions/YOUR-SUBSCRIPTION-ID \
-  --sdk-auth
+  --json-auth
+```
+
+**⚠️ If you get a "deprecated" or "policy" error**, try this alternative:
+```bash
+# Alternative method without deprecated flags
+az ad sp create-for-rbac \
+  --name "containerWorkshop-github" \
+  --role contributor \
+  --scopes /subscriptions/$(az account show --query id -o tsv)
 ```
 
 **📝 Important**: Copy the entire JSON output!
+
+**🚨 Troubleshooting Service Principal Creation:**
+
+If you encounter **"Credential lifetime exceeds the max value"** error:
+
+**Option 1: Contact Azure Administrator**
+```text
+Your organization has a policy limiting service principal credential lifetime.
+Contact your Azure administrator to:
+1. Create a service principal for you, OR
+2. Temporarily adjust the policy for workshop purposes
+```
+
+**Option 2: Use Personal Azure Subscription**
+```bash
+# If using a personal Azure subscription without restrictive policies
+az ad sp create-for-rbac \
+  --name "containerWorkshop-github" \
+  --role contributor \
+  --scopes /subscriptions/YOUR-PERSONAL-SUBSCRIPTION-ID
+```
+
+**Option 3: Alternative GitHub OIDC Setup** (Advanced)
+```text
+For organizations with strict policies, consider using GitHub's 
+OpenID Connect (OIDC) integration instead of service principals.
+See: https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect
+```
 
 ### **Step 3: Configure GitHub Repository Secret**
 1. **Go to your forked repository** on GitHub
@@ -116,6 +153,13 @@ After successful deployment, you should see in the workflow output:
 ---
 
 ## 🛠️ **Troubleshooting**
+
+### **Issue**: "Credential lifetime exceeds the max value allowed"
+**Root Cause**: Organization policy restricts service principal credential duration
+**Solutions**:
+1. **Contact Azure Administrator** to create SP for you or adjust policy
+2. **Use Personal Azure Subscription** without restrictive policies
+3. **Consider GitHub OIDC** for advanced enterprise scenarios
 
 ### **Issue**: "Azure CLI Login Failed"
 **Solution**: Verify your `AZURE_CREDENTIALS` secret format matches:
