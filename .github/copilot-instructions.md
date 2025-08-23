@@ -19,6 +19,14 @@ This is a production-ready workshop project demonstrating Azure Container Apps w
 - Use environment variables for all configuration with `.env.template` as reference
 - Maintain TypeScript-ready code structure even in JavaScript files
 
+### PowerShell Command Guidelines
+- **Never use backslash line continuations** (`\`) in commands - PowerShell doesn't support them
+- **Always use single-line commands** for copy-paste friendliness
+- **Use `powershell` syntax highlighting** instead of `bash` for Azure CLI commands
+- **Avoid deprecated Azure CLI flags** like `--sdk-auth` (use modern equivalents)
+- **Test commands in PowerShell** before including in documentation
+- **Example**: Use `az ad sp create-for-rbac --name "name" --role contributor --scopes /subscriptions/ID` instead of multi-line format
+
 ### Azure Container Apps Specific
 - Always enable DAPR for backend services with proper component configuration
 - Use proper health check endpoints (`/health` for backend, nginx health for frontend)
@@ -97,6 +105,17 @@ The project supports easy customization through:
 2. Update network activity tracking if adding API calls
 3. Maintain responsive design with Tailwind CSS
 4. Test container build with `docker build -f frontend/Dockerfile .`
+
+## Troubleshooting Common Issues
+- Container startup failures: Check health endpoints and DAPR component configuration
+- Network communication issues: Verify ingress settings and service discovery
+- Deployment failures: Check Azure quotas and resource naming conflicts
+- Local development issues: Ensure Docker and DAPR CLI are properly installed
+- **Service Principal Policy Errors**: "Credential lifetime exceeds max value" indicates restrictive organizational policies
+  - Solution 1: Contact Azure administrator to create SP or adjust policy
+  - Solution 2: Use personal Azure subscription without restrictions
+  - Solution 3: Implement GitHub OIDC for enterprise scenarios
+- **PowerShell Command Failures**: Ensure commands use single-line format without backslash continuations
 
 ## Security Considerations
 - Use managed identities for all Azure service authentication

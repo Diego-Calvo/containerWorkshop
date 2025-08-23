@@ -28,35 +28,24 @@ You'll need Azure CLI for this one step. If you don't have it locally, use Azure
 2. **Select Bash or PowerShell**
 3. **Run the following commands**:
 
-```bash
+```powershell
 # Create service principal for GitHub Actions (modern approach)
-az ad sp create-for-rbac \
-  --name "containerWorkshop-github-$(whoami)" \
-  --role contributor \
-  --scopes /subscriptions/$(az account show --query id -o tsv) \
-  --json-auth
+az ad sp create-for-rbac --name "containerWorkshop-github-$(whoami)" --role contributor --scopes /subscriptions/$(az account show --query id -o tsv) --json-auth
 ```
 
 **Option B: Local Azure CLI**
-```bash
+```powershell
 # Login to Azure
 az login
 
 # Create service principal (replace YOUR-SUBSCRIPTION-ID with your actual subscription ID)
-az ad sp create-for-rbac \
-  --name "containerWorkshop-github" \
-  --role contributor \
-  --scopes /subscriptions/YOUR-SUBSCRIPTION-ID \
-  --json-auth
+az ad sp create-for-rbac --name "containerWorkshop-github" --role contributor --scopes /subscriptions/YOUR-SUBSCRIPTION-ID --json-auth
 ```
 
 **⚠️ If you get a "deprecated" or "policy" error**, try this alternative:
-```bash
+```powershell
 # Alternative method without deprecated flags
-az ad sp create-for-rbac \
-  --name "containerWorkshop-github" \
-  --role contributor \
-  --scopes /subscriptions/$(az account show --query id -o tsv)
+az ad sp create-for-rbac --name "containerWorkshop-github" --role contributor --scopes /subscriptions/$(az account show --query id -o tsv)
 ```
 
 **📝 Important**: Copy the entire JSON output!
@@ -74,12 +63,9 @@ Contact your Azure administrator to:
 ```
 
 **Option 2: Use Personal Azure Subscription**
-```bash
+```powershell
 # If using a personal Azure subscription without restrictive policies
-az ad sp create-for-rbac \
-  --name "containerWorkshop-github" \
-  --role contributor \
-  --scopes /subscriptions/YOUR-PERSONAL-SUBSCRIPTION-ID
+az ad sp create-for-rbac --name "containerWorkshop-github" --role contributor --scopes /subscriptions/YOUR-PERSONAL-SUBSCRIPTION-ID
 ```
 
 **Option 3: Alternative GitHub OIDC Setup** (Advanced)

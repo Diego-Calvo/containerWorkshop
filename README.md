@@ -92,13 +92,9 @@ docker-compose up --build
 - 🏗️ **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Advanced deployment options and configuration
 
 ### **⚡ Quick Azure Setup**
-```bash
+```powershell
 # Create Azure Service Principal for GitHub Actions
-az ad sp create-for-rbac \
-  --name "containerWorkshop-github" \
-  --role contributor \
-  --scopes /subscriptions/YOUR-SUBSCRIPTION-ID \
-  --sdk-auth
+az ad sp create-for-rbac --name "containerWorkshop-github" --role contributor --scopes /subscriptions/YOUR-SUBSCRIPTION-ID
 
 # Add the JSON output as GitHub Secret: AZURE_CREDENTIALS
 # Then push to dev branch for automatic deployment!

@@ -257,34 +257,21 @@ app.get('/api/hello/:name', (req, res) => {
 ## 🔧 **Advanced Operations**
 
 ### **Container Scaling**
-```bash
+```powershell
 # Scale frontend
-az containerapp update \
-  --name workshop-frontend-dev \
-  --resource-group containerWorkshop \
-  --min-replicas 1 \
-  --max-replicas 5
+az containerapp update --name workshop-frontend-dev --resource-group containerWorkshop --min-replicas 1 --max-replicas 5
 
 # Check scaling status
-az containerapp show \
-  --name workshop-frontend-dev \
-  --resource-group containerWorkshop \
-  --query "properties.template.scale"
+az containerapp show --name workshop-frontend-dev --resource-group containerWorkshop --query "properties.template.scale"
 ```
 
 ### **View Logs**
-```bash
+```powershell
 # Frontend logs
-az containerapp logs show \
-  --name workshop-frontend-dev \
-  --resource-group containerWorkshop \
-  --follow
+az containerapp logs show --name workshop-frontend-dev --resource-group containerWorkshop --follow
 
 # Backend logs  
-az containerapp logs show \
-  --name workshop-backend-dev \
-  --resource-group containerWorkshop \
-  --follow
+az containerapp logs show --name workshop-backend-dev --resource-group containerWorkshop --follow
 ```
 
 ### **Environment Variables**
@@ -317,10 +304,10 @@ az containerapp update \
 
 ---
 
-## 🧹 **Cleanup**
-```bash
-# Remove all resources
-az group delete --name containerWorkshop --yes --no-wait
+## 🧹 **Cleanup** (End of Workshop)
+```powershell
+# In Azure Cloud Shell or local Azure CLI
+az group delete --name containerWorkshop-[yourname] --yes --no-wait
 ```
 
 ---
