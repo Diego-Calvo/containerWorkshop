@@ -22,48 +22,9 @@ Deploy Azure Container Apps infrastructure using GitHub Actions after forking th
 
 ### **Step 2: Create Azure Service Principal**
 
-**⚠️ Important**: Due to restrictive organizational policies, the standard service principal creation method may fail. Here are the working alternatives:
+**Certificate-Based Authentication (Enterprise Solution)**
 
-**Option A: Personal Azure Subscription (Recommended)**
-If you have access to a personal Azure subscription without organizational restrictions:
-1. **Go to**: https://shell.azure.com
-2. **Switch to personal subscription**: `az account set --subscription "Personal-Subscription-ID"`
-3. **Run**:
-```powershell
-az ad sp create-for-rbac `
-  --name "containerWorkshop-github-$env:USERNAME" `
-  --role contributor `
-  --scopes /subscriptions/$(az account show --query id -o tsv) `
-  --years 1
-```
-This will produce the standard JSON format that works with GitHub Actions.
-
-**Option B: GitHub Codespaces (Browser-Based)**
-Use GitHub Codespaces to run the workshop entirely in the browser:
-1. **Go to your forked repository** on GitHub
-2. **Click "Code"** → **"Codespaces"** → **"Create codespace on dev"**
-3. **Install Azure CLI** in the codespace and run the service principal creation
-4. This bypasses local organizational restrictions
-
-**Option C: Alternative Azure Account**
-If you have access to:
-- A different Azure subscription (partner, trial, student, etc.)
-- A different organizational tenant with less restrictive policies
-- Use that account for the workshop
-
-**Option D: Admin-Assisted Setup (If Available)**
-If you can contact your Azure administrator, ask them to run:
-```powershell
-az ad sp create-for-rbac `
-  --name "containerWorkshop-USERNAME" `
-  --role contributor `
-  --scopes /subscriptions/YOUR-SUBSCRIPTION-ID `
-  --years 1
-```
-
-**Option E: Certificate-Based Workaround (Now Supported)**
-
-If you have Azure CLI access and PowerShell expertise:
+For enterprise environments with restrictive credential policies, we'll use certificate-based authentication which bypasses password credential restrictions.
 
 1. **Create App Registration**:
 ```powershell
@@ -79,6 +40,20 @@ az ad sp create --id "YOUR-APP-ID-FROM-STEP-1"
 3. **Create Certificate Credential**:
 ```powershell
 az ad app credential reset --id "YOUR-APP-ID-FROM-STEP-1" --create-cert --end-date "2025-12-01"
+```
+**📝 Save from the output**: 
+- `appId` (if not already saved)
+- `tenant` (tenantId)
+- `fileWithCertAndPrivateKey` (the full path to the .pem file)
+
+**Example output**:
+```json
+{
+  "appId": "12345678-1234-1234-1234-123456789abc",
+  "fileWithCertAndPrivateKey": "C:\\Users\\yourusername\\tmp12345678.pem",
+  "password": null,
+  "tenant": "87654321-4321-4321-4321-210987654321"
+}
 ```
 
 4. **Assign Role**:
@@ -108,32 +83,7 @@ $certPath = "YOUR-CERTIFICATE-FILE-PATH-FROM-STEP-3"
 "@
 ```
 
-**✅ This workflow now supports certificate authentication!** The GitHub Actions workflow has been modified to handle certificate-based login directly with Azure CLI.
-
-**⚠️ Standard Method (May Fail in Enterprise Environments)**
-This is the traditional approach, but it will fail with "CredentialInvalidLifetimeAsPerAppPolicy" error in organizations with restrictive policies:
-
-```powershell
-# This command will likely FAIL in your environment:
-az ad sp create-for-rbac `
-  --name "containerWorkshop-github-$env:USERNAME" `
-  --role contributor `
-  --scopes /subscriptions/$(az account show --query id -o tsv) `
-  --years 1
-```
-
-**📝 Important**: Copy the entire JSON output! The GitHub Actions workflow requires this **exact format**:
-
-```json
-{
-  "clientId": "00000000-0000-0000-0000-000000000000",
-  "clientSecret": "your-secret-value-here",
-  "subscriptionId": "00000000-0000-0000-0000-000000000000",
-  "tenantId": "00000000-0000-0000-0000-000000000000"
-}
-```
-
-**⚠️ Critical**: The workflow uses `azure/login@v1` which **only supports client secrets**, not certificates. If you used Option B (certificate method), you would need to modify the GitHub Actions workflow to use Azure CLI directly instead of the login action.
+**📝 Important**: Copy the entire JSON output! This certificate-based format is supported by the GitHub Actions workflow.
 
 ### **Step 3: Configure GitHub Repository Secret**
 1. **Go to your forked repository** on GitHub
@@ -202,40 +152,35 @@ After successful deployment, you should see in the workflow output:
 
 ### **Issue**: "CredentialInvalidLifetimeAsPerAppPolicy" or "Credential lifetime exceeds the max value"
 **Root Cause**: Organization policy restricts service principal credential duration
-**Practical Solutions**:
-1. **Use Personal Azure Subscription** - if available and allowed for workshop
-2. **Use GitHub Codespaces** - runs in browser, bypasses local restrictions  
-3. **Try Alternative Azure Account** - trial, student, or partner subscriptions
-4. **Use Different Tenant** - if you have access to less restrictive organizations
-5. **Contact Azure Administrator** - request SP creation (if available)
+**Solution**: Use the certificate-based authentication method above, which bypasses password credential restrictions.
 
-**Note**: Removing `--years` parameter or using shorter durations typically won't work if the policy is this restrictive.
+### **Issue**: "Azure CLI Login Failed" or "jq: parse error: Invalid string: control characters"
+**Root Cause**: The `AZURE_CREDENTIALS` secret contains improperly formatted JSON with unescaped newlines
+**Solution**: When creating the certificate JSON, ensure newlines are properly escaped with `\n`:
 
-### **Issue**: "Azure CLI Login Failed" or "Content is not a valid JSON object"
-**Root Cause**: The `AZURE_CREDENTIALS` secret contains invalid JSON or wrong authentication format
-**Solution**: Verify your `AZURE_CREDENTIALS` secret format matches one of these:
+**❌ Incorrect (causes jq parse error):**
+```json
+{
+  "clientId": "...",
+  "clientCertificate": "-----BEGIN PRIVATE KEY-----
+MIIEvgIBADANBgkqhkiG9w0BAQE...
+-----END CERTIFICATE-----",
+  "subscriptionId": "...",
+  "tenantId": "..."
+}
+```
 
-**✅ Option 1: Client Secret Format:**
+**✅ Correct (properly escaped):**
 ```json
 {
   "clientId": "00000000-0000-0000-0000-000000000000",
-  "clientSecret": "your-secret-here",
+  "clientCertificate": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQE...\n-----END CERTIFICATE-----",
   "subscriptionId": "00000000-0000-0000-0000-000000000000",
   "tenantId": "00000000-0000-0000-0000-000000000000"
 }
 ```
 
-**✅ Option 2: Certificate Format (Now Supported):**
-```json
-{
-  "clientId": "00000000-0000-0000-0000-000000000000",
-  "clientCertificate": "-----BEGIN PRIVATE KEY-----\n...\n-----END CERTIFICATE-----",
-  "subscriptionId": "00000000-0000-0000-0000-000000000000",
-  "tenantId": "00000000-0000-0000-0000-000000000000"
-}
-```
-
-**Fix**: Use any of the Options A-E above to get the correct format.
+**Fix**: Use the PowerShell script in Step 5 above, which automatically handles the proper JSON escaping.
 
 ### **Issue**: "Resource Group Already Exists"
 **Solution**: Use a different resource group name or delete the existing one

@@ -72,25 +72,41 @@ jobs:
 
     - name: Azure CLI Login
       run: |
-        # Create temporary certificate file from secret
-        echo '${{ secrets.AZURE_CREDENTIALS }}' > azure_creds.json
+        # Create temporary certificate file from secret (properly handle JSON escaping)
+        cat > azure_creds.json << 'EOF'
+        ${{ secrets.AZURE_CREDENTIALS }}
+        EOF
+        
+        # Validate JSON format
+        if ! jq empty azure_creds.json 2>/dev/null; then
+          echo "Error: AZURE_CREDENTIALS secret contains invalid JSON"
+          echo "Please ensure your secret follows this format:"
+          echo '{"clientId":"...","clientCertificate":"-----BEGIN PRIVATE KEY-----\\n...\\n-----END CERTIFICATE-----","subscriptionId":"...","tenantId":"..."}'
+          exit 1
+        fi
         
         # Extract certificate content and save to file
-        cat azure_creds.json | jq -r '.clientCertificate' > client_cert.pem
+        jq -r '.clientCertificate' azure_creds.json > client_cert.pem
         
         # Extract other credentials
-        CLIENT_ID=$(cat azure_creds.json | jq -r '.clientId')
-        TENANT_ID=$(cat azure_creds.json | jq -r '.tenantId')
-        SUBSCRIPTION_ID=$(cat azure_creds.json | jq -r '.subscriptionId')
+        CLIENT_ID=$(jq -r '.clientId' azure_creds.json)
+        TENANT_ID=$(jq -r '.tenantId' azure_creds.json)
+        SUBSCRIPTION_ID=$(jq -r '.subscriptionId' azure_creds.json)
+        
+        # Validate extracted values
+        if [[ "$CLIENT_ID" == "null" || "$TENANT_ID" == "null" || "$SUBSCRIPTION_ID" == "null" ]]; then
+          echo "Error: Missing required fields in AZURE_CREDENTIALS secret"
+          exit 1
+        fi
         
         # Login with certificate
         az login --service-principal \
-          --username $CLIENT_ID \
-          --tenant $TENANT_ID \
+          --username "$CLIENT_ID" \
+          --tenant "$TENANT_ID" \
           --password client_cert.pem
         
         # Set default subscription
-        az account set --subscription $SUBSCRIPTION_ID
+        az account set --subscription "$SUBSCRIPTION_ID"
         
         # Clean up certificate file
         rm -f client_cert.pem azure_creds.json
@@ -150,25 +166,41 @@ jobs:
 
     - name: Azure CLI Login
       run: |
-        # Create temporary certificate file from secret
-        echo '${{ secrets.AZURE_CREDENTIALS }}' > azure_creds.json
+        # Create temporary certificate file from secret (properly handle JSON escaping)
+        cat > azure_creds.json << 'EOF'
+        ${{ secrets.AZURE_CREDENTIALS }}
+        EOF
+        
+        # Validate JSON format
+        if ! jq empty azure_creds.json 2>/dev/null; then
+          echo "Error: AZURE_CREDENTIALS secret contains invalid JSON"
+          echo "Please ensure your secret follows this format:"
+          echo '{"clientId":"...","clientCertificate":"-----BEGIN PRIVATE KEY-----\\n...\\n-----END CERTIFICATE-----","subscriptionId":"...","tenantId":"..."}'
+          exit 1
+        fi
         
         # Extract certificate content and save to file
-        cat azure_creds.json | jq -r '.clientCertificate' > client_cert.pem
+        jq -r '.clientCertificate' azure_creds.json > client_cert.pem
         
         # Extract other credentials
-        CLIENT_ID=$(cat azure_creds.json | jq -r '.clientId')
-        TENANT_ID=$(cat azure_creds.json | jq -r '.tenantId')
-        SUBSCRIPTION_ID=$(cat azure_creds.json | jq -r '.subscriptionId')
+        CLIENT_ID=$(jq -r '.clientId' azure_creds.json)
+        TENANT_ID=$(jq -r '.tenantId' azure_creds.json)
+        SUBSCRIPTION_ID=$(jq -r '.subscriptionId' azure_creds.json)
+        
+        # Validate extracted values
+        if [[ "$CLIENT_ID" == "null" || "$TENANT_ID" == "null" || "$SUBSCRIPTION_ID" == "null" ]]; then
+          echo "Error: Missing required fields in AZURE_CREDENTIALS secret"
+          exit 1
+        fi
         
         # Login with certificate
         az login --service-principal \
-          --username $CLIENT_ID \
-          --tenant $TENANT_ID \
+          --username "$CLIENT_ID" \
+          --tenant "$TENANT_ID" \
           --password client_cert.pem
         
         # Set default subscription
-        az account set --subscription $SUBSCRIPTION_ID
+        az account set --subscription "$SUBSCRIPTION_ID"
         
         # Clean up certificate file
         rm -f client_cert.pem azure_creds.json
