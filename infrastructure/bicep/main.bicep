@@ -1,9 +1,6 @@
 @description('The name of the Container Apps Environment')
 param environmentName string = 'workshop-env'
 
-@description('The name of the resource group')
-param resourceGroupName string = resourceGroup().name
-
 @description('The location for all resources')
 param location string = resourceGroup().location
 
@@ -63,7 +60,7 @@ resource containerRegistry 'Microsoft.ContainerRegistry/registries@2023-01-01-pr
   }
   tags: {
     'azd-env-name': environmentName
-    'workshop': 'container-apps'
+    workshop: 'container-apps'
   }
 }
 
@@ -79,7 +76,7 @@ resource logAnalytics 'Microsoft.OperationalInsights/workspaces@2022-10-01' = {
   }
   tags: {
     'azd-env-name': environmentName
-    'workshop': 'container-apps'
+    workshop: 'container-apps'
   }
 }
 
@@ -100,7 +97,7 @@ resource containerAppsEnvironment 'Microsoft.App/managedEnvironments@2023-05-01'
   }
   tags: {
     'azd-env-name': environmentName
-    'workshop': 'container-apps'
+    workshop: 'container-apps'
   }
 }
 
@@ -115,7 +112,7 @@ resource applicationInsights 'Microsoft.Insights/components@2020-02-02' = {
   }
   tags: {
     'azd-env-name': environmentName
-    'workshop': 'container-apps'
+    workshop: 'container-apps'
   }
 }
 
@@ -183,7 +180,7 @@ resource cosmosDbAccount 'Microsoft.DocumentDB/databaseAccounts@2023-04-15' = {
   }
   tags: {
     'azd-env-name': environmentName
-    'workshop': 'container-apps'
+    workshop: 'container-apps'
   }
 }
 
@@ -221,7 +218,7 @@ resource userAssignedIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@
   location: location
   tags: {
     'azd-env-name': environmentName
-    'workshop': 'container-apps'
+    workshop: 'container-apps'
   }
 }
 
@@ -324,7 +321,7 @@ resource backendContainerApp 'Microsoft.App/containerApps@2023-05-01' = {
   ]
   tags: {
     'azd-env-name': environmentName
-    'workshop': 'container-apps'
+    workshop: 'container-apps'
   }
 }
 
@@ -397,7 +394,7 @@ resource frontendContainerApp 'Microsoft.App/containerApps@2023-05-01' = {
   ]
   tags: {
     'azd-env-name': environmentName
-    'workshop': 'container-apps'
+    workshop: 'container-apps'
   }
 }
 

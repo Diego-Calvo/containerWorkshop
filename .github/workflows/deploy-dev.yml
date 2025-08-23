@@ -128,7 +128,8 @@ jobs:
       id: deploy
       run: |
         # Deploy the Bicep template
-        DEPLOYMENT_OUTPUT=$(az deployment group create \
+        echo "🚀 Starting Bicep deployment..."
+        az deployment group create \
           --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
           --template-file infrastructure/bicep/main.bicep \
           --parameters \
@@ -136,6 +137,13 @@ jobs:
             location="${{ env.LOCATION }}" \
             namePrefix="workshop" \
             containerRegistryName="${{ env.CONTAINER_REGISTRY_NAME }}" \
+          --output table
+        
+        echo "📊 Extracting deployment outputs..."
+        # Get outputs in a separate command to avoid content consumption issues
+        DEPLOYMENT_OUTPUT=$(az deployment group show \
+          --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+          --name main \
           --query 'properties.outputs' \
           --output json)
         
