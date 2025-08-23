@@ -99,11 +99,11 @@ jobs:
           exit 1
         fi
         
-        # Login with certificate
+        # Login with certificate (using --certificate parameter, not --password)
         az login --service-principal \
           --username "$CLIENT_ID" \
           --tenant "$TENANT_ID" \
-          --password client_cert.pem
+          --certificate client_cert.pem
         
         # Set default subscription
         az account set --subscription "$SUBSCRIPTION_ID"
@@ -193,11 +193,11 @@ jobs:
           exit 1
         fi
         
-        # Login with certificate
+        # Login with certificate (using --certificate parameter, not --password)
         az login --service-principal \
           --username "$CLIENT_ID" \
           --tenant "$TENANT_ID" \
-          --password client_cert.pem
+          --certificate client_cert.pem
         
         # Set default subscription
         az account set --subscription "$SUBSCRIPTION_ID"

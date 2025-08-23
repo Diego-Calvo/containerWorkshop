@@ -72,11 +72,14 @@ $tenantId = "YOUR-TENANT-ID-FROM-STEP-3-OUTPUT"
 $subscriptionId = (az account show --query id -o tsv)
 $certPath = "YOUR-CERTIFICATE-FILE-PATH-FROM-STEP-3"
 
-# Create the JSON for GitHub Actions
+# Read certificate and properly escape newlines for JSON
+$certContent = (Get-Content $certPath -Raw) -replace "`r`n", "\n" -replace "`n", "\n"
+
+# Create the JSON for GitHub Actions with properly escaped certificate
 @"
 {
   "clientId": "$appId",
-  "clientCertificate": "$(Get-Content $certPath -Raw)",
+  "clientCertificate": "$certContent",
   "subscriptionId": "$subscriptionId",
   "tenantId": "$tenantId"
 }
@@ -161,26 +164,35 @@ After successful deployment, you should see in the workflow output:
 **❌ Incorrect (causes jq parse error):**
 ```json
 {
-  "clientId": "...",
+  "clientId": "e2875146-4ae6-46ae-a4c8-8290262d6c5e",
   "clientCertificate": "-----BEGIN PRIVATE KEY-----
-MIIEvgIBADANBgkqhkiG9w0BAQE...
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC8z11Bae964qet
 -----END CERTIFICATE-----",
-  "subscriptionId": "...",
-  "tenantId": "..."
+  "subscriptionId": "22bef3f7-2d9a-4a9a-99be-7fe6c650fbd5",
+  "tenantId": "16b3c013-d300-468d-ac64-7eda0820b6d3"
 }
 ```
 
 **✅ Correct (properly escaped):**
 ```json
 {
-  "clientId": "00000000-0000-0000-0000-000000000000",
-  "clientCertificate": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQE...\n-----END CERTIFICATE-----",
-  "subscriptionId": "00000000-0000-0000-0000-000000000000",
-  "tenantId": "00000000-0000-0000-0000-000000000000"
+  "clientId": "e2875146-4ae6-46ae-a4c8-8290262d6c5e",
+  "clientCertificate": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC8z11Bae964qet\n-----END CERTIFICATE-----",
+  "subscriptionId": "22bef3f7-2d9a-4a9a-99be-7fe6c650fbd5",
+  "tenantId": "16b3c013-d300-468d-ac64-7eda0820b6d3"
 }
 ```
 
-**Fix**: Use the PowerShell script in Step 5 above, which automatically handles the proper JSON escaping.
+**Fix**: Use the updated PowerShell script in Step 5 above, which now properly escapes newlines with the `-replace` commands.
+
+### **Issue**: "AADSTS7000215: Invalid client secret provided" or "--password no longer accepts a service principal certificate"
+**Root Cause**: Azure CLI changed to require `--certificate` parameter instead of `--password` for certificate authentication
+**Solution**: This has been fixed in the latest GitHub Actions workflow. If you encounter this error:
+1. **Ensure you're using the latest workflow** from the repository
+2. **Re-run the GitHub Actions workflow** - it now uses the correct `--certificate` parameter
+3. **Verify your certificate format** is still properly escaped in the JSON secret
+
+**Note**: This error indicates you may be using an older version of the workflow that still uses `--password client_cert.pem`.
 
 ### **Issue**: "Resource Group Already Exists"
 **Solution**: Use a different resource group name or delete the existing one
