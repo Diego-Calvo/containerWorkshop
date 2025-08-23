@@ -9,7 +9,7 @@ Deploy Azure Container Apps infrastructure using GitHub Actions after forking th
 - **GitHub account**
 - **Azure Subscription** with Contributor permissions
 - **Web browser** (no local tools required!)
-
+- **Azure CLI** Administrator User
 ---
 
 ## 🚀 **Lab Steps**
@@ -30,7 +30,11 @@ You'll need Azure CLI for this one step. If you don't have it locally, use Azure
 
 ```powershell
 # Create service principal for GitHub Actions (modern approach)
-az ad sp create-for-rbac --name "containerWorkshop-github-$(whoami)" --role contributor --scopes /subscriptions/$(az account show --query id -o tsv) --json-auth
+az ad sp create-for-rbac `
+  --name "containerWorkshop-github-$(whoami)" `
+  --role contributor `
+  --scopes /subscriptions/$(az account show --query id -o tsv) `
+  --json-auth
 ```
 
 **Option B: Local Azure CLI**
@@ -39,13 +43,20 @@ az ad sp create-for-rbac --name "containerWorkshop-github-$(whoami)" --role cont
 az login
 
 # Create service principal (replace YOUR-SUBSCRIPTION-ID with your actual subscription ID)
-az ad sp create-for-rbac --name "containerWorkshop-github" --role contributor --scopes /subscriptions/YOUR-SUBSCRIPTION-ID --json-auth
+az ad sp create-for-rbac `
+  --name "containerWorkshop-github" `
+  --role contributor `
+  --scopes /subscriptions/YOUR-SUBSCRIPTION-ID `
+  --json-auth
 ```
 
 **⚠️ If you get a "deprecated" or "policy" error**, try this alternative:
 ```powershell
 # Alternative method without deprecated flags
-az ad sp create-for-rbac --name "containerWorkshop-github" --role contributor --scopes /subscriptions/$(az account show --query id -o tsv)
+az ad sp create-for-rbac `
+  --name "containerWorkshop-github" `
+  --role contributor `
+  --scopes /subscriptions/$(az account show --query id -o tsv)
 ```
 
 **📝 Important**: Copy the entire JSON output!
@@ -65,7 +76,10 @@ Contact your Azure administrator to:
 **Option 2: Use Personal Azure Subscription**
 ```powershell
 # If using a personal Azure subscription without restrictive policies
-az ad sp create-for-rbac --name "containerWorkshop-github" --role contributor --scopes /subscriptions/YOUR-PERSONAL-SUBSCRIPTION-ID
+az ad sp create-for-rbac `
+  --name "containerWorkshop-github" `
+  --role contributor `
+  --scopes /subscriptions/YOUR-PERSONAL-SUBSCRIPTION-ID
 ```
 
 **Option 3: Alternative GitHub OIDC Setup** (Advanced)

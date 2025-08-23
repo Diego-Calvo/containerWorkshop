@@ -20,12 +20,19 @@ This is a production-ready workshop project demonstrating Azure Container Apps w
 - Maintain TypeScript-ready code structure even in JavaScript files
 
 ### PowerShell Command Guidelines
-- **Never use backslash line continuations** (`\`) in commands - PowerShell doesn't support them
-- **Always use single-line commands** for copy-paste friendliness
+- **Use backticks (`) for line continuations** in PowerShell - never use backslashes (\)
+- **Always use proper PowerShell syntax** for multi-line commands
 - **Use `powershell` syntax highlighting** instead of `bash` for Azure CLI commands
 - **Avoid deprecated Azure CLI flags** like `--sdk-auth` (use modern equivalents)
 - **Test commands in PowerShell** before including in documentation
-- **Example**: Use `az ad sp create-for-rbac --name "name" --role contributor --scopes /subscriptions/ID` instead of multi-line format
+- **Example**: Use backticks for readability:
+  ```powershell
+  az ad sp create-for-rbac `
+    --name "name" `
+    --role contributor `
+    --scopes /subscriptions/ID
+  ```
+- **Prefer single-line for simple commands** but use backticks when line becomes too long
 
 ### Azure Container Apps Specific
 - Always enable DAPR for backend services with proper component configuration
@@ -115,7 +122,7 @@ The project supports easy customization through:
   - Solution 1: Contact Azure administrator to create SP or adjust policy
   - Solution 2: Use personal Azure subscription without restrictions
   - Solution 3: Implement GitHub OIDC for enterprise scenarios
-- **PowerShell Command Failures**: Ensure commands use single-line format without backslash continuations
+- **PowerShell Command Failures**: Ensure commands use proper PowerShell syntax with backticks (`) for line continuations, never backslashes (\)
 
 ## Security Considerations
 - Use managed identities for all Azure service authentication
