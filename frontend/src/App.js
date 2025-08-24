@@ -211,7 +211,21 @@ function App() {
       setLoading(false);
     }
   };
-
+  
+ // Custom greeting endpoint for workshop
+   app.get('/api/hello/:name', (req, res) => {
+     try {
+       const { name } = req.params;
+       res.json({ 
+         message: `Hello ${name}! Welcome to Azure Container Apps!`,
+         workshop: 'Container Apps Demo',
+         timestamp: new Date().toISOString(),
+         containerHost: process.env.HOSTNAME || 'unknown'
+       });
+     } catch (error) {
+       res.status(500).json({ error: 'Failed to greet' });
+     }
+   });
   const toggleTodo = async (id) => {
     // Add animation effect
     setAnimatingTodos(prev => new Set([...prev, id]));
