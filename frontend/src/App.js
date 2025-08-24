@@ -17,35 +17,8 @@ function App() {
   const [activeRequests, setActiveRequests] = useState(0);
   const [lastApiCall, setLastApiCall] = useState(null);
   
-  // Get API URL from environment or detect based on hostname for Container Apps
-  const getApiUrl = () => {
-    // If environment variable is set, use it
-    if (process.env.REACT_APP_API_URL) {
-      return process.env.REACT_APP_API_URL;
-    }
-    
-    // For local development
-    if (window.location.hostname === 'localhost') {
-      return 'http://localhost:3001';
-    }
-    
-    // For Container Apps deployment, replace 'frontend' with 'backend' in the hostname
-    if (window.location.hostname.includes('azurecontainerapps.io')) {
-      const backendHostname = window.location.hostname.replace('workshop-frontend-dev', 'workshop-backend-dev');
-      return `https://${backendHostname}`;
-    }
-    
-    // Fallback
-    return 'http://localhost:3001';
-  };
-  
-  const API_BASE = getApiUrl();
-  
-  // Log the API URL being used for debugging
-  useEffect(() => {
-    console.log('🔗 API Base URL:', API_BASE);
-    console.log('🌐 Current hostname:', window.location.hostname);
-  }, [API_BASE]);
+  // Get API URL from environment or use default for local development
+  const API_BASE = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 
   // Helper function to log API calls
   const logApiCall = (endpoint, method = 'GET', status = 'loading') => {
@@ -211,21 +184,7 @@ function App() {
       setLoading(false);
     }
   };
-  
- // Custom greeting endpoint for workshop
-   app.get('/api/hello/:name', (req, res) => {
-     try {
-       const { name } = req.params;
-       res.json({ 
-         message: `Hello ${name}! Welcome to Azure Container Apps!`,
-         workshop: 'Container Apps Demo',
-         timestamp: new Date().toISOString(),
-         containerHost: process.env.HOSTNAME || 'unknown'
-       });
-     } catch (error) {
-       res.status(500).json({ error: 'Failed to greet' });
-     }
-   });
+
   const toggleTodo = async (id) => {
     // Add animation effect
     setAnimatingTodos(prev => new Set([...prev, id]));
