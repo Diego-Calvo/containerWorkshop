@@ -127,30 +127,103 @@ jobs:
     - name: Deploy Infrastructure
       id: deploy
       run: |
-        # Deploy the Bicep template
+        # Deploy the Bicep template with a specific deployment name
         echo "🚀 Starting Bicep deployment..."
+        DEPLOYMENT_NAME="infrastructure-deployment-$(date +%s)"
+        echo "📝 Deployment name: $DEPLOYMENT_NAME"
+        
+        # Deploy without capturing output to avoid stream conflicts
         az deployment group create \
           --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
           --template-file infrastructure/bicep/main.bicep \
+          --name "$DEPLOYMENT_NAME" \
           --parameters \
             environmentName="${{ env.ENVIRONMENT_NAME }}" \
             location="${{ env.LOCATION }}" \
             namePrefix="workshop" \
             containerRegistryName="${{ env.CONTAINER_REGISTRY_NAME }}" \
+          --no-wait false \
           --output table
         
-        echo "📊 Extracting deployment outputs..."
-        # Get outputs in a separate command to avoid content consumption issues
-        DEPLOYMENT_OUTPUT=$(az deployment group show \
-          --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
-          --name main \
-          --query 'properties.outputs' \
-          --output json)
+        # Wait a moment for deployment to complete registration
+        echo "⏳ Waiting for deployment registration..."
+        sleep 5
         
-        # Extract outputs
-        REGISTRY_NAME=$(echo $DEPLOYMENT_OUTPUT | jq -r '.containerRegistryName.value')
-        REGISTRY_LOGIN_SERVER=$(echo $DEPLOYMENT_OUTPUT | jq -r '.containerRegistryLoginServer.value')
-        ENV_NAME=$(echo $DEPLOYMENT_OUTPUT | jq -r '.environmentName.value')
+        echo "📊 Extracting deployment outputs..."
+        # Try multiple approaches to get outputs
+        DEPLOYMENT_OUTPUT=""
+        
+        # Approach 1: Try with specific deployment name
+        if [[ -z "$DEPLOYMENT_OUTPUT" ]]; then
+          echo "🔍 Trying with deployment name: $DEPLOYMENT_NAME"
+          DEPLOYMENT_OUTPUT=$(az deployment group show \
+            --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+            --name "$DEPLOYMENT_NAME" \
+            --query 'properties.outputs' \
+            --output json 2>/dev/null || echo "")
+        fi
+        
+        # Approach 2: Try getting the latest deployment
+        if [[ -z "$DEPLOYMENT_OUTPUT" ]]; then
+          echo "🔍 Trying to get latest deployment..."
+          LATEST_DEPLOYMENT=$(az deployment group list \
+            --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+            --query '[0].name' \
+            --output tsv 2>/dev/null || echo "")
+          
+          if [[ -n "$LATEST_DEPLOYMENT" ]]; then
+            DEPLOYMENT_OUTPUT=$(az deployment group show \
+              --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+              --name "$LATEST_DEPLOYMENT" \
+              --query 'properties.outputs' \
+              --output json 2>/dev/null || echo "")
+          fi
+        fi
+        
+        # Approach 3: Get outputs from actual resources if deployment outputs fail
+        if [[ -z "$DEPLOYMENT_OUTPUT" || "$DEPLOYMENT_OUTPUT" == "null" ]]; then
+          echo "🔍 Getting outputs from deployed resources..."
+          
+          # Get container registry info
+          REGISTRY_INFO=$(az acr list \
+            --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+            --query "[?contains(name, 'workshop')][0]" \
+            --output json)
+          
+          REGISTRY_NAME=$(echo "$REGISTRY_INFO" | jq -r '.name // "null"')
+          REGISTRY_LOGIN_SERVER=$(echo "$REGISTRY_INFO" | jq -r '.loginServer // "null"')
+          
+          # Get container apps environment info
+          ENV_INFO=$(az containerapp env list \
+            --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+            --query "[0]" \
+            --output json)
+          
+          ENV_NAME=$(echo "$ENV_INFO" | jq -r '.name // "null"')
+          
+        else
+          echo "🔍 Raw deployment output:"
+          echo "$DEPLOYMENT_OUTPUT"
+          
+          # Extract outputs with error checking
+          REGISTRY_NAME=$(echo "$DEPLOYMENT_OUTPUT" | jq -r '.containerRegistryName.value // "null"')
+          REGISTRY_LOGIN_SERVER=$(echo "$DEPLOYMENT_OUTPUT" | jq -r '.containerRegistryLoginServer.value // "null"')
+          ENV_NAME=$(echo "$DEPLOYMENT_OUTPUT" | jq -r '.environmentName.value // "null"')
+        fi
+        
+        echo "🔍 Final extracted values:"
+        echo "  Registry Name: $REGISTRY_NAME"
+        echo "  Login Server: $REGISTRY_LOGIN_SERVER" 
+        echo "  Environment: $ENV_NAME"
+        
+        # Validate outputs
+        if [[ "$REGISTRY_NAME" == "null" || "$REGISTRY_LOGIN_SERVER" == "null" || "$ENV_NAME" == "null" ]]; then
+          echo "❌ Error: Failed to extract deployment outputs"
+          echo "Registry Name: $REGISTRY_NAME"
+          echo "Login Server: $REGISTRY_LOGIN_SERVER"
+          echo "Environment: $ENV_NAME"
+          exit 1
+        fi
         
         # Set outputs for next job
         echo "containerRegistryName=$REGISTRY_NAME" >> $GITHUB_OUTPUT
