@@ -349,8 +349,8 @@ jobs:
   # Application deployment job
   deploy-applications:
     runs-on: ubuntu-latest
-    if: ${{ github.event.inputs.deployApplications != 'false' }}
-    needs: deploy-infrastructure
+    if: ${{ github.event.inputs.deployApplications != 'false' && (always() || success()) }}
+    needs: [deploy-infrastructure]
     # Continue even if infrastructure deployment was skipped
     
     steps:
