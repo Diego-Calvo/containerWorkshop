@@ -41,7 +41,7 @@ on:
 
 env:
   # Use workflow inputs for manual deployment, or repository variables/defaults for automatic deployment
-  RESOURCE_GROUP_NAME: ${{ github.event.inputs.resourceGroupName || vars.RESOURCE_GROUP_NAME || 'containerWorkshop' }}
+  RESOURCE_GROUP_NAME: ${{ github.event.inputs.resourceGroupName || vars.RESOURCE_GROUP_NAME || 'containerWorkshop-test' }}
   LOCATION: ${{ github.event.inputs.location || vars.AZURE_LOCATION || 'eastus2' }}
   ENVIRONMENT_NAME: ${{ github.event.inputs.environmentName || vars.ENVIRONMENT_NAME || 'workshop-dev-env' }}
   
@@ -480,6 +480,13 @@ jobs:
 
     - name: Deploy Backend Container App
       run: |
+        # Delete existing backend app if it exists
+        echo "🧹 Cleaning up existing backend app..."
+        az containerapp delete \
+          --name ${{ env.BACKEND_APP_NAME }} \
+          --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+          --yes || echo "Backend app doesn't exist yet"
+        
         # Get registry server and environment from either infrastructure deployment or existing infrastructure
         if [ "${{ needs.deploy-infrastructure.result }}" == "success" ]; then
           REGISTRY_SERVER="${{ needs.deploy-infrastructure.outputs.containerRegistryLoginServer }}"
@@ -527,6 +534,13 @@ jobs:
 
     - name: Deploy Frontend Container App
       run: |
+        # Delete existing frontend app if it exists
+        echo "🧹 Cleaning up existing frontend app..."
+        az containerapp delete \
+          --name ${{ env.FRONTEND_APP_NAME }} \
+          --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+          --yes || echo "Frontend app doesn't exist yet"
+        
         # Get registry server and environment from either infrastructure deployment or existing infrastructure
         if [ "${{ needs.deploy-infrastructure.result }}" == "success" ]; then
           REGISTRY_SERVER="${{ needs.deploy-infrastructure.outputs.containerRegistryLoginServer }}"
