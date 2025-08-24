@@ -62,9 +62,10 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.event.inputs.deployInfrastructure != 'false' }}
     outputs:
-      containerRegistryName: ${{ steps.deploy.outputs.containerRegistryName }}
-      containerRegistryLoginServer: ${{ steps.deploy.outputs.containerRegistryLoginServer }}
-      environmentName: ${{ steps.deploy.outputs.environmentName }}
+      containerRegistryName: ${{ steps.check-infrastructure.outputs.containerRegistryName || steps.deploy.outputs.containerRegistryName }}
+      containerRegistryLoginServer: ${{ steps.check-infrastructure.outputs.containerRegistryLoginServer || steps.deploy.outputs.containerRegistryLoginServer }}
+      environmentName: ${{ steps.check-infrastructure.outputs.environmentName || steps.deploy.outputs.environmentName }}
+      infrastructureExists: ${{ steps.check-infrastructure.outputs.INFRASTRUCTURE_EXISTS }}
     
     steps:
     - name: Checkout repository
@@ -115,17 +116,69 @@ jobs:
 
     - name: Create Resource Group
       run: |
-        az group create \
-          --name ${{ env.RESOURCE_GROUP_NAME }} \
-          --location ${{ env.LOCATION }} \
-          --tags \
-            "Environment=Development" \
-            "Project=ContainerWorkshop" \
-            "DeployedBy=GitHubActions" \
-            "Branch=${{ github.ref_name }}"
+        # Check if resource group already exists
+        echo "🔍 Checking if resource group '${{ env.RESOURCE_GROUP_NAME }}' exists..."
+        
+        if az group show --name ${{ env.RESOURCE_GROUP_NAME }} --output none 2>/dev/null; then
+          echo "✅ Resource group '${{ env.RESOURCE_GROUP_NAME }}' already exists"
+          echo "📋 Current resource group info:"
+          az group show --name ${{ env.RESOURCE_GROUP_NAME }} --output table
+        else
+          echo "🚀 Creating resource group '${{ env.RESOURCE_GROUP_NAME }}'..."
+          az group create \
+            --name ${{ env.RESOURCE_GROUP_NAME }} \
+            --location ${{ env.LOCATION }} \
+            --tags \
+              "Environment=Development" \
+              "Project=ContainerWorkshop" \
+              "DeployedBy=GitHubActions" \
+              "Branch=${{ github.ref_name }}"
+          echo "✅ Resource group created successfully"
+        fi
+
+    - name: Check Existing Infrastructure
+      id: check-infrastructure
+      run: |
+        # Check if key infrastructure components already exist
+        echo "🔍 Checking existing infrastructure components..."
+        
+        # Check for Container Apps Environment
+        EXISTING_ENV=$(az containerapp env list \
+          --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+          --query "[?name=='${{ env.ENVIRONMENT_NAME }}'].name" \
+          --output tsv 2>/dev/null || echo "")
+        
+        # Check for Container Registry
+        EXISTING_ACR=$(az acr list \
+          --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+          --query "[?name=='${{ env.CONTAINER_REGISTRY_NAME }}'].name" \
+          --output tsv 2>/dev/null || echo "")
+        
+        if [[ -n "$EXISTING_ENV" && -n "$EXISTING_ACR" ]]; then
+          echo "✅ Infrastructure already exists:"
+          echo "  • Container Apps Environment: $EXISTING_ENV"
+          echo "  • Container Registry: $EXISTING_ACR"
+          echo "🔄 Will skip infrastructure deployment and use existing resources"
+          echo "INFRASTRUCTURE_EXISTS=true" >> $GITHUB_OUTPUT
+          
+          # Get existing infrastructure info for next job
+          REGISTRY_LOGIN_SERVER=$(az acr show \
+            --name ${{ env.CONTAINER_REGISTRY_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+            --query "loginServer" \
+            --output tsv)
+          
+          echo "containerRegistryName=${{ env.CONTAINER_REGISTRY_NAME }}" >> $GITHUB_OUTPUT
+          echo "containerRegistryLoginServer=$REGISTRY_LOGIN_SERVER" >> $GITHUB_OUTPUT
+          echo "environmentName=${{ env.ENVIRONMENT_NAME }}" >> $GITHUB_OUTPUT
+        else
+          echo "🚀 Infrastructure needs to be deployed"
+          echo "INFRASTRUCTURE_EXISTS=false" >> $GITHUB_OUTPUT
+        fi
 
     - name: Deploy Infrastructure
       id: deploy
+      if: steps.check-infrastructure.outputs.INFRASTRUCTURE_EXISTS == 'false'
       run: |
         # Deploy the Bicep template with a specific deployment name
         echo "🚀 Starting Bicep deployment..."
