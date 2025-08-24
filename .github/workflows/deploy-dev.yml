@@ -195,7 +195,6 @@ jobs:
             location="${{ env.LOCATION }}" \
             namePrefix="workshop" \
             containerRegistryName="${{ env.CONTAINER_REGISTRY_NAME }}" \
-          --no-wait false \
           --output table
         
         # Wait a moment for deployment to complete registration
