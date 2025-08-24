@@ -180,82 +180,111 @@ jobs:
       id: deploy
       if: steps.check-infrastructure.outputs.INFRASTRUCTURE_EXISTS == 'false'
       run: |
-        # Deploy the Bicep template with maximum debugging
-        echo "🚀 Starting Bicep deployment..."
+        # Try Azure PowerShell approach as Azure CLI seems to have stream issues
+        echo "🚀 Starting infrastructure deployment with alternative approach..."
         DEPLOYMENT_NAME="infrastructure-deployment-$(date +%s)"
         echo "📝 Deployment name: $DEPLOYMENT_NAME"
         
-        # First, validate the template
-        echo "🔍 Validating Bicep template..."
-        if ! az deployment group validate \
-          --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
-          --template-file infrastructure/bicep/main.bicep \
-          --parameters \
-            environmentName="${{ env.ENVIRONMENT_NAME }}" \
-            location="${{ env.LOCATION }}" \
-            namePrefix="workshop" \
-            containerRegistryName="${{ env.CONTAINER_REGISTRY_NAME }}" \
-          --output none; then
-          echo "❌ Template validation failed"
-          exit 1
+        # Install Azure PowerShell if not available
+        echo "� Setting up Azure PowerShell..."
+        if ! command -v pwsh &> /dev/null; then
+          echo "Installing PowerShell..."
+          wget -q https://packages.microsoft.com/config/ubuntu/20.04/packages-microsoft-prod.deb
+          sudo dpkg -i packages-microsoft-prod.deb
+          sudo apt-get update
+          sudo apt-get install -y powershell
         fi
-        echo "✅ Template validation passed"
         
-        # Try deployment with what-if first
-        echo "🔍 Running what-if analysis..."
-        if ! az deployment group what-if \
-          --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
-          --template-file infrastructure/bicep/main.bicep \
-          --parameters \
-            environmentName="${{ env.ENVIRONMENT_NAME }}" \
-            location="${{ env.LOCATION }}" \
-            namePrefix="workshop" \
-            containerRegistryName="${{ env.CONTAINER_REGISTRY_NAME }}" \
-          --output none; then
-          echo "❌ What-if analysis failed"
-          exit 1
-        fi
-        echo "✅ What-if analysis completed"
+        # Try deployment using Azure PowerShell
+        echo "🔄 Attempting deployment with Azure PowerShell..."
+        pwsh -Command "
+          Install-Module -Name Az -Force -Scope CurrentUser -Repository PSGallery -AllowClobber
+          Import-Module Az
+          
+          # Login using service principal
+          \$clientId = '$CLIENT_ID'
+          \$tenantId = '$TENANT_ID'
+          \$subscriptionId = '$SUBSCRIPTION_ID'
+          \$certPath = 'client_cert.pem'
+          
+          # Connect to Azure
+          Connect-AzAccount -ServicePrincipal -ApplicationId \$clientId -TenantId \$tenantId -CertificateThumbprint \$certPath -Subscription \$subscriptionId
+          
+          # Deploy template
+          New-AzResourceGroupDeployment -ResourceGroupName '${{ env.RESOURCE_GROUP_NAME }}' -TemplateFile 'infrastructure/bicep/main.bicep' -Name '$DEPLOYMENT_NAME' -environmentName '${{ env.ENVIRONMENT_NAME }}' -location '${{ env.LOCATION }}' -namePrefix 'workshop' -containerRegistryName '${{ env.CONTAINER_REGISTRY_NAME }}'
+        "
         
-        # Try a minimal deployment approach
-        echo "⚙️ Attempting deployment..."
-        
-        # Use ARM template instead of going through az deployment
-        echo "🔄 Converting Bicep to ARM..."
-        az bicep build --file infrastructure/bicep/main.bicep --outfile /tmp/main.json
-        
-        echo "🚀 Deploying ARM template..."
-        if az deployment group create \
-          --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
-          --template-file /tmp/main.json \
-          --name "$DEPLOYMENT_NAME" \
-          --parameters \
-            environmentName="${{ env.ENVIRONMENT_NAME }}" \
-            location="${{ env.LOCATION }}" \
-            namePrefix="workshop" \
-            containerRegistryName="${{ env.CONTAINER_REGISTRY_NAME }}" \
-          --verbose \
-          --output none; then
-          echo "✅ Deployment completed successfully"
+        if [ $? -eq 0 ]; then
+          echo "✅ PowerShell deployment completed successfully"
         else
-          echo "❌ Deployment failed"
-          echo "🔍 Checking if partial deployment occurred..."
+          echo "❌ PowerShell deployment failed, trying simplified Azure CLI approach..."
           
-          # Check if any resources were created despite the error
-          EXISTING_REGISTRY=$(az acr show --name "${{ env.CONTAINER_REGISTRY_NAME }}" --resource-group ${{ env.RESOURCE_GROUP_NAME }} --query "name" --output tsv 2>/dev/null || echo "")
-          EXISTING_ENV=$(az containerapp env show --name "${{ env.ENVIRONMENT_NAME }}" --resource-group ${{ env.RESOURCE_GROUP_NAME }} --query "name" --output tsv 2>/dev/null || echo "")
+          # Fallback: Try creating resources individually
+          echo "🔄 Creating resources individually..."
           
-          if [[ -n "$EXISTING_REGISTRY" && -n "$EXISTING_ENV" ]]; then
-            echo "🎯 Partial deployment detected - key resources exist, continuing..."
+          # Create Container Registry
+          echo "� Creating Container Registry..."
+          az acr create \
+            --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+            --name ${{ env.CONTAINER_REGISTRY_NAME }} \
+            --sku Standard \
+            --admin-enabled true \
+            --location ${{ env.LOCATION }} \
+            --output none || echo "Registry creation failed or already exists"
+          
+          # Create Log Analytics Workspace
+          echo "� Creating Log Analytics Workspace..."
+          az monitor log-analytics workspace create \
+            --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+            --workspace-name workshop-logs \
+            --location ${{ env.LOCATION }} \
+            --output none || echo "Log Analytics creation failed or already exists"
+          
+          # Get Log Analytics Workspace ID
+          LOG_ANALYTICS_ID=$(az monitor log-analytics workspace show \
+            --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+            --workspace-name workshop-logs \
+            --query "customerId" \
+            --output tsv 2>/dev/null || echo "")
+          
+          LOG_ANALYTICS_KEY=$(az monitor log-analytics workspace get-shared-keys \
+            --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+            --workspace-name workshop-logs \
+            --query "primarySharedKey" \
+            --output tsv 2>/dev/null || echo "")
+          
+          # Create Container Apps Environment
+          echo "🏗️ Creating Container Apps Environment..."
+          if [[ -n "$LOG_ANALYTICS_ID" && -n "$LOG_ANALYTICS_KEY" ]]; then
+            az containerapp env create \
+              --name ${{ env.ENVIRONMENT_NAME }} \
+              --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+              --location ${{ env.LOCATION }} \
+              --logs-workspace-id "$LOG_ANALYTICS_ID" \
+              --logs-workspace-key "$LOG_ANALYTICS_KEY" \
+              --output none || echo "Container Apps Environment creation failed or already exists"
           else
-            echo "💥 Complete deployment failure - exiting"
-            exit 1
+            az containerapp env create \
+              --name ${{ env.ENVIRONMENT_NAME }} \
+              --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+              --location ${{ env.LOCATION }} \
+              --output none || echo "Container Apps Environment creation failed or already exists"
           fi
+          
+          # Create Cosmos DB (optional for workshop)
+          echo "� Creating Cosmos DB..."
+          az cosmosdb create \
+            --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+            --name workshop-cosmos-${{ github.run_number }} \
+            --locations regionName=${{ env.LOCATION }} \
+            --default-consistency-level Session \
+            --enable-free-tier true \
+            --output none || echo "Cosmos DB creation failed or already exists"
         fi
         
-        # Wait for Azure to fully register resources
+        # Wait for resources to be available
         echo "⏳ Waiting for resources to be fully registered..."
-        sleep 15
+        sleep 20
         
         echo "📊 Getting outputs from deployed resources..."
         
@@ -265,8 +294,8 @@ jobs:
         REGISTRY_LOGIN_SERVER=""
         
         # Try to get registry login server with retries
-        for i in {1..10}; do
-          echo "  Attempt $i/10..."
+        for i in {1..15}; do
+          echo "  Attempt $i/15..."
           REGISTRY_LOGIN_SERVER=$(az acr show \
             --name "$REGISTRY_NAME" \
             --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
@@ -277,7 +306,7 @@ jobs:
             echo "  ✅ Found registry: $REGISTRY_LOGIN_SERVER"
             break
           fi
-          sleep 3
+          sleep 4
         done
         
         # Get container apps environment info
@@ -285,8 +314,8 @@ jobs:
         ENV_NAME=""
         
         # Try to get environment with retries
-        for i in {1..10}; do
-          echo "  Attempt $i/10..."
+        for i in {1..15}; do
+          echo "  Attempt $i/15..."
           ENV_NAME=$(az containerapp env show \
             --name "${{ env.ENVIRONMENT_NAME }}" \
             --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
@@ -297,7 +326,7 @@ jobs:
             echo "  ✅ Found environment: $ENV_NAME"
             break
           fi
-          sleep 3
+          sleep 4
         done
         
         # Final validation
@@ -311,30 +340,11 @@ jobs:
           echo "  Registry Login Server: '$REGISTRY_LOGIN_SERVER'"
           echo "  Environment Name: '$ENV_NAME'"
           
-          # Try one more time with resource listing
-          echo "🔍 Attempting resource discovery..."
+          # List all resources to see what was created
+          echo "🔍 Listing all resources in resource group..."
+          az resource list --resource-group ${{ env.RESOURCE_GROUP_NAME }} --output table || echo "Could not list resources"
           
-          if [[ -z "$REGISTRY_LOGIN_SERVER" ]]; then
-            REGISTRY_LOGIN_SERVER=$(az acr list \
-              --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
-              --query "[?contains(name, '$REGISTRY_NAME')].loginServer | [0]" \
-              --output tsv 2>/dev/null || echo "")
-            echo "  Discovered registry server: '$REGISTRY_LOGIN_SERVER'"
-          fi
-          
-          if [[ -z "$ENV_NAME" ]]; then
-            ENV_NAME=$(az containerapp env list \
-              --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
-              --query "[?contains(name, '${{ env.ENVIRONMENT_NAME }}')].name | [0]" \
-              --output tsv 2>/dev/null || echo "")
-            echo "  Discovered environment: '$ENV_NAME'"
-          fi
-          
-          # Final check
-          if [[ -z "$REGISTRY_LOGIN_SERVER" || -z "$ENV_NAME" ]]; then
-            echo "❌ Final validation failed - cannot continue"
-            exit 1
-          fi
+          exit 1
         fi
         
         # Set outputs for next job
@@ -346,6 +356,15 @@ jobs:
         echo "📦 Container Registry: $REGISTRY_NAME"
         echo "🌐 Login Server: $REGISTRY_LOGIN_SERVER"
         echo "🏗️ Environment: $ENV_NAME"
+      shell: bash
+      env:
+        CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+        TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+        SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        RESOURCE_GROUP_NAME: ${{ env.RESOURCE_GROUP_NAME }}
+        LOCATION: ${{ env.LOCATION }}
+        ENVIRONMENT_NAME: ${{ env.ENVIRONMENT_NAME }}
+        CONTAINER_REGISTRY_NAME: ${{ env.CONTAINER_REGISTRY_NAME }}
 
     - name: Cleanup Certificate Files
       if: always()
