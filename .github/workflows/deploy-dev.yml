@@ -536,6 +536,15 @@ jobs:
           ENV_NAME="${{ steps.get-existing.outputs.environmentName }}"
         fi
         
+        # Get backend URL for API communication
+        BACKEND_URL=$(az containerapp show \
+          --name ${{ env.BACKEND_APP_NAME }} \
+          --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+          --query 'properties.configuration.ingress.fqdn' \
+          --output tsv)
+        
+        echo "📝 Backend URL for frontend: https://$BACKEND_URL"
+        
         IMAGE_TAG="dev-${{ github.sha }}"
         
         az containerapp create \
@@ -551,7 +560,6 @@ jobs:
           --cpu 0.25 \
           --memory 0.5Gi \
           --env-vars \
-            "REACT_APP_API_URL=$BACKEND_URL" \
             "NODE_ENV=production" \
           --tags \
             "Environment=Development" \
