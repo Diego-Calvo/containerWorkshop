@@ -314,307 +314,454 @@ function App() {
     <div className="App">
       <header className="App-header">
         <div className="header-top">
-          <h1>🚀 Azure Container Apps Workshop</h1>
-          <div className="system-status">
-            <div className={`status-indicator ${systemHealth?.status === 'healthy' ? 'healthy' : 'unhealthy'}`}>
-              {systemHealth?.status === 'healthy' ? '🟢' : '🔴'} 
-              {systemHealth?.status || 'Unknown'}
+          <div className="header-content">
+            <div className="header-title-section">
+              <h1>
+                <span className="title-icon">🚀</span>
+                <span className="title-text">Azure Container Apps</span>
+                <span className="title-accent">Workshop</span>
+              </h1>
+              <p className="header-subtitle">
+                Modern cloud-native application showcase with interactive architecture
+              </p>
             </div>
-            {systemHealth?.dapr?.enabled && (
-              <div className="dapr-status">🔧 DAPR Enabled</div>
-            )}
+            <div className="system-status-modern">
+              <div className="status-card">
+                <div className="status-header">
+                  <span className="status-icon">🏥</span>
+                  <span className="status-title">System Health</span>
+                </div>
+                <div className={`status-value ${systemHealth?.status === 'healthy' ? 'healthy' : 'unhealthy'}`}>
+                  {systemHealth?.status === 'healthy' ? '🟢 Healthy' : '🔴 Unhealthy'}
+                </div>
+              </div>
+              <div className="status-card">
+                <div className="status-header">
+                  <span className="status-icon">🔧</span>
+                  <span className="status-title">DAPR Status</span>
+                </div>
+                <div className={`status-value ${systemHealth?.dapr?.enabled ? 'enabled' : 'demo'}`}>
+                  {systemHealth?.dapr?.enabled ? '🟢 Production' : '� Demo Mode'}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Container Network Activity Dashboard */}
-        <div className="network-activity-dashboard">
-          <h3>🔗 Container Communication</h3>
-          <div className="container-info">
-            <div className="container-card frontend">
-              <div className="container-title">🌐 Frontend Container</div>
-              <div className="container-details">React (nginx) - Port 3000</div>
-              <div className="container-status">✅ Active</div>
+        {/* Modern Container Communication Dashboard */}
+        <div className="modern-network-dashboard">
+          <div className="dashboard-header">
+            <div className="dashboard-title">
+              <span className="dashboard-icon">🔗</span>
+              <h3>Container Communication</h3>
             </div>
-            <div className="network-arrow">
-              <div className={`arrow ${activeRequests > 0 ? 'active' : ''}`}>
-                {activeRequests > 0 ? '🔄' : '➡️'}
+            <div className="dashboard-metrics">
+              <div className="metric-item">
+                <span className="metric-value">{activeRequests}</span>
+                <span className="metric-label">Active</span>
               </div>
-              <div className="network-label">
-                {activeRequests > 0 ? `${activeRequests} Active API Calls` : 'API Calls'}
-              </div>
-            </div>
-            <div className="container-card backend">
-              <div className="container-title">⚙️ Backend Container</div>
-              <div className="container-details">Node.js API - Port 3001</div>
-              <div className="container-status">
-                {systemHealth?.status === 'healthy' ? '✅ Healthy' : '❌ Unhealthy'}
+              <div className="metric-item">
+                <span className="metric-value">{networkActivity.length}</span>
+                <span className="metric-label">Total</span>
               </div>
             </div>
           </div>
           
-          {/* Recent API Calls - Categorized */}
-          <div className="api-calls-log">
-            <h4>📡 Recent API Activity</h4>
+          <div className="container-communication-flow">
+            <div className="container-node frontend">
+              <div className="node-icon">🌐</div>
+              <div className="node-content">
+                <h4>Frontend Container</h4>
+                <div className="node-details">
+                  <span>React + Nginx</span>
+                  <span className="port-info">Port 3000</span>
+                </div>
+                <div className="node-status active">✅ Active</div>
+              </div>
+            </div>
+            
+            <div className="communication-flow">
+              <div className={`flow-line ${activeRequests > 0 ? 'active' : ''}`}>
+                <div className="flow-indicator">
+                  {activeRequests > 0 ? '🔄' : '💫'}
+                </div>
+                <div className="flow-label">
+                  {activeRequests > 0 ? `${activeRequests} Active` : 'API Ready'}
+                </div>
+              </div>
+            </div>
+            
+            <div className="container-node backend">
+              <div className="node-icon">⚙️</div>
+              <div className="node-content">
+                <h4>Backend Container</h4>
+                <div className="node-details">
+                  <span>Node.js + DAPR</span>
+                  <span className="port-info">Port 3001</span>
+                </div>
+                <div className={`node-status ${systemHealth?.status === 'healthy' ? 'healthy' : 'unhealthy'}`}>
+                  {systemHealth?.status === 'healthy' ? '✅ Healthy' : '❌ Unhealthy'}
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Modern API Activity Tracker */}
+          <div className="modern-activity-tracker">
+            <div className="activity-header">
+              <h4>📡 Live API Activity</h4>
+              <div className="activity-summary">
+                {networkActivity.length > 0 ? `${networkActivity.length} recent calls` : 'No recent activity'}
+              </div>
+            </div>
+            
             {networkActivity.length > 0 ? (
-              <div className="api-calls-categories">
+              <div className="activity-categories-modern">
                 {/* Health API Calls */}
-                <div className="api-category">
-                  <h5>🏥 Health</h5>
-                  <div className="api-calls-column">
+                <div className="activity-category-modern health">
+                  <div className="category-header">
+                    <span className="category-icon">🏥</span>
+                    <h5>Health Checks</h5>
+                    <span className="category-count">
+                      {networkActivity.filter(call => call.endpoint.includes('/health')).length}
+                    </span>
+                  </div>
+                  <div className="activity-items-modern">
                     {networkActivity
                       .filter(call => call.endpoint.includes('/health'))
                       .slice(0, 3)
                       .map((call) => (
-                        <div key={call.id} className={`api-call-box health ${call.status}`}>
-                          <div className="api-call-header">
-                            <div className="api-call-method">{call.method}</div>
-                            <div className="api-call-status-icon">
-                              {call.status === 'loading' && '⏳'}
-                              {call.status === 'success' && '✅'}
-                              {call.status === 'error' && '❌'}
-                            </div>
-                          </div>
-                          <div className="api-call-endpoint">{call.endpoint}</div>
-                          <div className="api-call-details">
-                            <div className="api-call-status">
-                              {call.status === 'loading' && 'Loading...'}
-                              {call.status === 'success' && `${call.responseTime}ms`}
-                              {call.status === 'error' && 'Error'}
-                            </div>
-                            <div className="api-call-time">
-                              {call.timestamp.toLocaleTimeString()}
+                        <div key={call.id} className={`activity-item-modern ${call.status}`}>
+                          <div className="activity-method-badge">{call.method}</div>
+                          <div className="activity-details-modern">
+                            <div className="activity-endpoint">{call.endpoint}</div>
+                            <div className="activity-meta">
+                              <span className="activity-time">{call.timestamp.toLocaleTimeString()}</span>
+                              {call.status === 'success' && call.responseTime && (
+                                <span className="response-time-badge">{call.responseTime}ms</span>
+                              )}
+                              <span className={`status-badge ${call.status}`}>
+                                {call.status === 'loading' && '⏳'}
+                                {call.status === 'success' && '✅'}
+                                {call.status === 'error' && '❌'}
+                              </span>
                             </div>
                           </div>
                         </div>
                       ))}
                     {networkActivity.filter(call => call.endpoint.includes('/health')).length === 0 && (
-                      <div className="no-activity-small">No health checks yet</div>
+                      <div className="empty-category">No health checks yet</div>
                     )}
                   </div>
                 </div>
 
                 {/* Stats API Calls */}
-                <div className="api-category">
-                  <h5>📊 Stats</h5>
-                  <div className="api-calls-column">
+                <div className="activity-category-modern stats">
+                  <div className="category-header">
+                    <span className="category-icon">📊</span>
+                    <h5>Statistics</h5>
+                    <span className="category-count">
+                      {networkActivity.filter(call => call.endpoint.includes('/stats')).length}
+                    </span>
+                  </div>
+                  <div className="activity-items-modern">
                     {networkActivity
                       .filter(call => call.endpoint.includes('/stats'))
                       .slice(0, 3)
                       .map((call) => (
-                        <div key={call.id} className={`api-call-box stats ${call.status}`}>
-                          <div className="api-call-header">
-                            <div className="api-call-method">{call.method}</div>
-                            <div className="api-call-status-icon">
-                              {call.status === 'loading' && '⏳'}
-                              {call.status === 'success' && '✅'}
-                              {call.status === 'error' && '❌'}
-                            </div>
-                          </div>
-                          <div className="api-call-endpoint">{call.endpoint}</div>
-                          <div className="api-call-details">
-                            <div className="api-call-status">
-                              {call.status === 'loading' && 'Loading...'}
-                              {call.status === 'success' && `${call.responseTime}ms`}
-                              {call.status === 'error' && 'Error'}
-                            </div>
-                            <div className="api-call-time">
-                              {call.timestamp.toLocaleTimeString()}
+                        <div key={call.id} className={`activity-item-modern ${call.status}`}>
+                          <div className="activity-method-badge">{call.method}</div>
+                          <div className="activity-details-modern">
+                            <div className="activity-endpoint">{call.endpoint}</div>
+                            <div className="activity-meta">
+                              <span className="activity-time">{call.timestamp.toLocaleTimeString()}</span>
+                              {call.status === 'success' && call.responseTime && (
+                                <span className="response-time-badge">{call.responseTime}ms</span>
+                              )}
+                              <span className={`status-badge ${call.status}`}>
+                                {call.status === 'loading' && '⏳'}
+                                {call.status === 'success' && '✅'}
+                                {call.status === 'error' && '❌'}
+                              </span>
                             </div>
                           </div>
                         </div>
                       ))}
                     {networkActivity.filter(call => call.endpoint.includes('/stats')).length === 0 && (
-                      <div className="no-activity-small">No stats requests yet</div>
+                      <div className="empty-category">No stats requests yet</div>
                     )}
                   </div>
                 </div>
 
-                {/* Todos API Calls */}
-                <div className="api-category">
-                  <h5>📝 Todos</h5>
-                  <div className="api-calls-column">
+                {/* Todo API Calls */}
+                <div className="activity-category-modern todos">
+                  <div className="category-header">
+                    <span className="category-icon">📝</span>
+                    <h5>Todo Operations</h5>
+                    <span className="category-count">
+                      {networkActivity.filter(call => call.endpoint.includes('/todos') || call.endpoint.includes('/api/todos')).length}
+                    </span>
+                  </div>
+                  <div className="activity-items-modern">
                     {networkActivity
                       .filter(call => call.endpoint.includes('/todos') || call.endpoint.includes('/api/todos'))
                       .slice(0, 3)
                       .map((call) => (
-                        <div key={call.id} className={`api-call-box todos ${call.status}`}>
-                          <div className="api-call-header">
-                            <div className="api-call-method">{call.method}</div>
-                            <div className="api-call-status-icon">
-                              {call.status === 'loading' && '⏳'}
-                              {call.status === 'success' && '✅'}
-                              {call.status === 'error' && '❌'}
-                            </div>
-                          </div>
-                          <div className="api-call-endpoint">{call.endpoint}</div>
-                          <div className="api-call-details">
-                            <div className="api-call-status">
-                              {call.status === 'loading' && 'Loading...'}
-                              {call.status === 'success' && `${call.responseTime}ms`}
-                              {call.status === 'error' && 'Error'}
-                            </div>
-                            <div className="api-call-time">
-                              {call.timestamp.toLocaleTimeString()}
+                        <div key={call.id} className={`activity-item-modern ${call.status}`}>
+                          <div className="activity-method-badge">{call.method}</div>
+                          <div className="activity-details-modern">
+                            <div className="activity-endpoint">{call.endpoint}</div>
+                            <div className="activity-meta">
+                              <span className="activity-time">{call.timestamp.toLocaleTimeString()}</span>
+                              {call.status === 'success' && call.responseTime && (
+                                <span className="response-time-badge">{call.responseTime}ms</span>
+                              )}
+                              <span className={`status-badge ${call.status}`}>
+                                {call.status === 'loading' && '⏳'}
+                                {call.status === 'success' && '✅'}
+                                {call.status === 'error' && '❌'}
+                              </span>
                             </div>
                           </div>
                         </div>
                       ))}
                     {networkActivity.filter(call => call.endpoint.includes('/todos') || call.endpoint.includes('/api/todos')).length === 0 && (
-                      <div className="no-activity-small">No todo operations yet</div>
+                      <div className="empty-category">No todo operations yet</div>
                     )}
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="no-activity">No recent API activity</div>
-            )}
-          </div>
-        </div>
-        
-        <h2>📝 Interactive Todo Manager</h2>
-        <p className="subtitle">Real-time data from DAPR-enabled backend</p>
-        
-        {/* Real-time Statistics Dashboard */}
-        {stats && (
-          <div className="stats-dashboard">
-            <div className="stat-card">
-              <div className="stat-number">{stats.total}</div>
-              <div className="stat-label">Total Tasks</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-number">{stats.pending}</div>
-              <div className="stat-label">Pending</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-number">{stats.completed}</div>
-              <div className="stat-label">Completed</div>
-            </div>
-            <div className="stat-card">
-              <div className="stat-number">
-                {stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%
+              <div className="no-activity-modern">
+                <div className="no-activity-icon">💤</div>
+                <div className="no-activity-text">No recent API activity</div>
+                <div className="no-activity-subtitle">Start using the app to see live communication</div>
               </div>
-              <div className="stat-label">Progress</div>
-            </div>
-          </div>
-        )}
-        
-        {error && (
-          <div className="error-message">
-            ⚠️ {error}
-          </div>
-        )}
-        
-        <div className="todo-controls">
-          <div className="todo-input">
-            <input
-              type="text"
-              value={newTodo}
-              onChange={(e) => setNewTodo(e.target.value)}
-              placeholder="What needs to be done? 🤔"
-              onKeyPress={(e) => e.key === 'Enter' && !loading && addTodo()}
-              disabled={loading}
-              className="modern-input"
-            />
-            <button 
-              onClick={addTodo} 
-              disabled={loading || !newTodo.trim()}
-              className="add-button modern-button"
-            >
-              {loading ? '⏳' : '➕'} Add
-            </button>
-          </div>
-          
-          <div className="filter-controls">
-            <button 
-              className={`filter-btn ${filter === 'all' ? 'active' : ''}`}
-              onClick={() => setFilter('all')}
-            >
-              All ({todos.length})
-            </button>
-            <button 
-              className={`filter-btn ${filter === 'pending' ? 'active' : ''}`}
-              onClick={() => setFilter('pending')}
-            >
-              Pending ({todos.filter(t => !t.completed).length})
-            </button>
-            <button 
-              className={`filter-btn ${filter === 'completed' ? 'active' : ''}`}
-              onClick={() => setFilter('completed')}
-            >
-              Completed ({todos.filter(t => t.completed).length})
-            </button>
-            {todos.some(t => t.completed) && (
-              <button 
-                className="clear-completed-btn"
-                onClick={clearCompleted}
-              >
-                🗑️ Clear Completed
-              </button>
             )}
           </div>
         </div>
         
-        <div className="todo-list">
-          {loading && todos.length === 0 ? (
-            <div className="loading">
-              <div className="spinner"></div>
-              Loading todos...
+        {/* Modern Todo Manager */}
+        <div className="modern-todo-manager">
+          <div className="manager-header">
+            <div className="manager-title">
+              <span className="manager-icon">📝</span>
+              <h2>Interactive Todo Manager</h2>
             </div>
-          ) : filteredTodos.length === 0 ? (
-            <div className="empty-state">
-              {filter === 'all' ? (
-                <div>
-                  <h3>🎉 All caught up!</h3>
-                  <p>No todos yet. Add one above to get started.</p>
+            <p className="manager-subtitle">Real-time data persistence with DAPR integration</p>
+          </div>
+        
+          {/* Modern Statistics Dashboard */}
+          {stats && (
+            <div className="modern-stats-dashboard">
+              <div className="stat-card-modern total">
+                <div className="stat-icon">📊</div>
+                <div className="stat-content">
+                  <div className="stat-number">{stats.total}</div>
+                  <div className="stat-label">Total Tasks</div>
                 </div>
-              ) : filter === 'pending' ? (
-                <div>
-                  <h3>✨ Nothing pending!</h3>
-                  <p>Great job! All tasks are completed.</p>
+              </div>
+              <div className="stat-card-modern pending">
+                <div className="stat-icon">⏳</div>
+                <div className="stat-content">
+                  <div className="stat-number">{stats.pending}</div>
+                  <div className="stat-label">Pending</div>
                 </div>
-              ) : (
-                <div>
-                  <h3>🎯 No completed tasks</h3>
-                  <p>Complete some tasks to see them here.</p>
+              </div>
+              <div className="stat-card-modern completed">
+                <div className="stat-icon">✅</div>
+                <div className="stat-content">
+                  <div className="stat-number">{stats.completed}</div>
+                  <div className="stat-label">Completed</div>
                 </div>
-              )}
-            </div>
-          ) : (
-            <div className="todo-grid">
-              {filteredTodos.map((todo, index) => (
-                <div 
-                  key={todo.id} 
-                  className={`todo-item ${todo.completed ? 'completed' : ''} ${animatingTodos.has(todo.id) ? 'animating' : ''}`}
-                  style={{ animationDelay: `${index * 0.1}s` }}
-                  onClick={() => toggleTodo(todo.id)}
-                >
-                  <div className="todo-content">
-                    <div className="todo-status">
-                      {todo.completed ? '✅' : '⭕'}
-                    </div>
-                    <div className="todo-text">{todo.text}</div>
-                    <button 
-                      className="delete-btn"
-                      onClick={(e) => deleteTodo(todo.id, e)}
-                      title="Delete todo"
-                    >
-                      🗑️
-                    </button>
+              </div>
+              <div className="stat-card-modern progress">
+                <div className="stat-icon">🎯</div>
+                <div className="stat-content">
+                  <div className="stat-number">
+                    {stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%
                   </div>
-                  {todo.createdAt && (
-                    <div className="todo-meta">
-                      <span className="todo-date">
-                        📅 {new Date(todo.createdAt).toLocaleDateString()}
-                      </span>
-                      <span className="todo-time">
-                        🕒 {new Date(todo.createdAt).toLocaleTimeString()}
-                      </span>
-                    </div>
-                  )}
+                  <div className="stat-label">Progress</div>
                 </div>
-              ))}
+                <div className="progress-ring">
+                  <svg width="60" height="60" className="progress-svg">
+                    <circle
+                      cx="30"
+                      cy="30"
+                      r="25"
+                      fill="none"
+                      stroke="rgba(255,255,255,0.1)"
+                      strokeWidth="3"
+                    />
+                    <circle
+                      cx="30"
+                      cy="30"
+                      r="25"
+                      fill="none"
+                      stroke="var(--accent-gradient-start)"
+                      strokeWidth="3"
+                      strokeDasharray={`${2 * Math.PI * 25}`}
+                      strokeDashoffset={`${2 * Math.PI * 25 * (1 - (stats.total > 0 ? stats.completed / stats.total : 0))}`}
+                      transform="rotate(-90 30 30)"
+                      className="progress-circle"
+                    />
+                  </svg>
+                </div>
+              </div>
             </div>
           )}
+          
+          {error && (
+            <div className="modern-error-message">
+              <div className="error-icon">⚠️</div>
+              <div className="error-text">{error}</div>
+            </div>
+          )}
+          
+          {/* Modern Todo Controls */}
+          <div className="modern-todo-controls">
+            <div className="todo-input-modern">
+              <div className="input-wrapper">
+                <span className="input-icon">✨</span>
+                <input
+                  type="text"
+                  value={newTodo}
+                  onChange={(e) => setNewTodo(e.target.value)}
+                  placeholder="What amazing thing will you accomplish today?"
+                  onKeyPress={(e) => e.key === 'Enter' && !loading && addTodo()}
+                  disabled={loading}
+                  className="modern-text-input"
+                />
+                <button 
+                  onClick={addTodo} 
+                  disabled={loading || !newTodo.trim()}
+                  className="modern-add-button"
+                >
+                  {loading ? (
+                    <span className="loading-spinner">⏳</span>
+                  ) : (
+                    <span className="add-icon">➕</span>
+                  )}
+                  <span className="add-text">Add Task</span>
+                </button>
+              </div>
+            </div>
+            
+            <div className="modern-filter-controls">
+              <div className="filter-group">
+                <button 
+                  className={`modern-filter-btn ${filter === 'all' ? 'active' : ''}`}
+                  onClick={() => setFilter('all')}
+                >
+                  <span className="filter-icon">📋</span>
+                  <span className="filter-text">All</span>
+                  <span className="filter-count">{todos.length}</span>
+                </button>
+                <button 
+                  className={`modern-filter-btn ${filter === 'pending' ? 'active' : ''}`}
+                  onClick={() => setFilter('pending')}
+                >
+                  <span className="filter-icon">⏳</span>
+                  <span className="filter-text">Pending</span>
+                  <span className="filter-count">{todos.filter(t => !t.completed).length}</span>
+                </button>
+                <button 
+                  className={`modern-filter-btn ${filter === 'completed' ? 'active' : ''}`}
+                  onClick={() => setFilter('completed')}
+                >
+                  <span className="filter-icon">✅</span>
+                  <span className="filter-text">Completed</span>
+                  <span className="filter-count">{todos.filter(t => t.completed).length}</span>
+                </button>
+              </div>
+              {todos.some(t => t.completed) && (
+                <button 
+                  className="modern-clear-button"
+                  onClick={clearCompleted}
+                >
+                  <span className="clear-icon">🗑️</span>
+                  <span className="clear-text">Clear Completed</span>
+                </button>
+              )}
+            </div>
+          </div>
+        
+        <div className="todo-list">
+          {/* Modern Todo List */}
+          <div className="modern-todo-list">
+            {loading && todos.length === 0 ? (
+              <div className="modern-loading">
+                <div className="loading-spinner-modern">⏳</div>
+                <div className="loading-text">Loading your tasks...</div>
+              </div>
+            ) : filteredTodos.length === 0 ? (
+              <div className="modern-empty-state">
+                {filter === 'all' ? (
+                  <div className="empty-content">
+                    <div className="empty-icon">🎉</div>
+                    <h3>Ready to be productive?</h3>
+                    <p>Add your first task above to get started on your journey!</p>
+                  </div>
+                ) : filter === 'pending' ? (
+                  <div className="empty-content">
+                    <div className="empty-icon">✨</div>
+                    <h3>All caught up!</h3>
+                    <p>Amazing work! You've completed all your tasks.</p>
+                  </div>
+                ) : (
+                  <div className="empty-content">
+                    <div className="empty-icon">🎯</div>
+                    <h3>No completed tasks yet</h3>
+                    <p>Mark some tasks as complete to see them here.</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="modern-todo-grid">
+                {filteredTodos.map((todo, index) => (
+                  <div 
+                    key={todo.id} 
+                    className={`modern-todo-item ${todo.completed ? 'completed' : 'pending'} ${animatingTodos.has(todo.id) ? 'animating' : ''}`}
+                    style={{ animationDelay: `${index * 0.1}s` }}
+                    onClick={() => toggleTodo(todo.id)}
+                  >
+                    <div className="todo-card-modern">
+                      <div className="todo-header-modern">
+                        <div className={`todo-status-modern ${todo.completed ? 'completed' : 'pending'}`}>
+                          {todo.completed ? '✅' : '⭕'}
+                        </div>
+                        <button 
+                          className="todo-delete-modern"
+                          onClick={(e) => deleteTodo(todo.id, e)}
+                          title="Delete task"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                      <div className="todo-body-modern">
+                        <div className={`todo-text-modern ${todo.completed ? 'completed' : ''}`}>
+                          {todo.text}
+                        </div>
+                        {todo.createdAt && (
+                          <div className="todo-meta-modern">
+                            <span className="meta-item">
+                              <span className="meta-icon">📅</span>
+                              {new Date(todo.createdAt).toLocaleDateString()}
+                            </span>
+                            <span className="meta-item">
+                              <span className="meta-icon">🕒</span>
+                              {new Date(todo.createdAt).toLocaleTimeString()}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
         </div>
         
         <div className="app-info">
