@@ -180,13 +180,14 @@ jobs:
       id: deploy
       if: steps.check-infrastructure.outputs.INFRASTRUCTURE_EXISTS == 'false'
       run: |
-        # Deploy the Bicep template with a specific deployment name
+        # Deploy the Bicep template with a simple approach
         echo "🚀 Starting Bicep deployment..."
         DEPLOYMENT_NAME="infrastructure-deployment-$(date +%s)"
         echo "📝 Deployment name: $DEPLOYMENT_NAME"
         
-        # Deploy without capturing output to avoid stream conflicts
-        az deployment group create \
+        # Deploy and capture exit code only
+        echo "⚙️ Executing deployment..."
+        if az deployment group create \
           --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
           --template-file infrastructure/bicep/main.bicep \
           --name "$DEPLOYMENT_NAME" \
@@ -195,86 +196,95 @@ jobs:
             location="${{ env.LOCATION }}" \
             namePrefix="workshop" \
             containerRegistryName="${{ env.CONTAINER_REGISTRY_NAME }}" \
-          --output table
-        
-        # Wait a moment for deployment to complete registration
-        echo "⏳ Waiting for deployment registration..."
-        sleep 5
-        
-        echo "📊 Extracting deployment outputs..."
-        # Try multiple approaches to get outputs
-        DEPLOYMENT_OUTPUT=""
-        
-        # Approach 1: Try with specific deployment name
-        if [[ -z "$DEPLOYMENT_OUTPUT" ]]; then
-          echo "🔍 Trying with deployment name: $DEPLOYMENT_NAME"
-          DEPLOYMENT_OUTPUT=$(az deployment group show \
-            --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
-            --name "$DEPLOYMENT_NAME" \
-            --query 'properties.outputs' \
-            --output json 2>/dev/null || echo "")
+          --output none; then
+          echo "✅ Deployment completed successfully"
+        else
+          echo "❌ Deployment failed"
+          exit 1
         fi
         
-        # Approach 2: Try getting the latest deployment
-        if [[ -z "$DEPLOYMENT_OUTPUT" ]]; then
-          echo "🔍 Trying to get latest deployment..."
-          LATEST_DEPLOYMENT=$(az deployment group list \
+        # Wait for Azure to fully register resources
+        echo "⏳ Waiting for resources to be fully registered..."
+        sleep 10
+        
+        echo "📊 Getting outputs from deployed resources..."
+        
+        # Get container registry info directly from Azure
+        echo "🔍 Querying Container Registry..."
+        REGISTRY_NAME="${{ env.CONTAINER_REGISTRY_NAME }}"
+        REGISTRY_LOGIN_SERVER=""
+        
+        # Try to get registry login server with retries
+        for i in {1..5}; do
+          echo "  Attempt $i/5..."
+          REGISTRY_LOGIN_SERVER=$(az acr show \
+            --name "$REGISTRY_NAME" \
             --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
-            --query '[0].name' \
+            --query "loginServer" \
             --output tsv 2>/dev/null || echo "")
           
-          if [[ -n "$LATEST_DEPLOYMENT" ]]; then
-            DEPLOYMENT_OUTPUT=$(az deployment group show \
-              --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
-              --name "$LATEST_DEPLOYMENT" \
-              --query 'properties.outputs' \
-              --output json 2>/dev/null || echo "")
+          if [[ -n "$REGISTRY_LOGIN_SERVER" ]]; then
+            echo "  ✅ Found registry: $REGISTRY_LOGIN_SERVER"
+            break
           fi
-        fi
+          sleep 2
+        done
         
-        # Approach 3: Get outputs from actual resources if deployment outputs fail
-        if [[ -z "$DEPLOYMENT_OUTPUT" || "$DEPLOYMENT_OUTPUT" == "null" ]]; then
-          echo "🔍 Getting outputs from deployed resources..."
-          
-          # Get container registry info
-          REGISTRY_INFO=$(az acr list \
-            --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
-            --query "[?contains(name, 'workshop')][0]" \
-            --output json)
-          
-          REGISTRY_NAME=$(echo "$REGISTRY_INFO" | jq -r '.name // "null"')
-          REGISTRY_LOGIN_SERVER=$(echo "$REGISTRY_INFO" | jq -r '.loginServer // "null"')
-          
-          # Get container apps environment info
-          ENV_INFO=$(az containerapp env list \
-            --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
-            --query "[0]" \
-            --output json)
-          
-          ENV_NAME=$(echo "$ENV_INFO" | jq -r '.name // "null"')
-          
-        else
-          echo "🔍 Raw deployment output:"
-          echo "$DEPLOYMENT_OUTPUT"
-          
-          # Extract outputs with error checking
-          REGISTRY_NAME=$(echo "$DEPLOYMENT_OUTPUT" | jq -r '.containerRegistryName.value // "null"')
-          REGISTRY_LOGIN_SERVER=$(echo "$DEPLOYMENT_OUTPUT" | jq -r '.containerRegistryLoginServer.value // "null"')
-          ENV_NAME=$(echo "$DEPLOYMENT_OUTPUT" | jq -r '.environmentName.value // "null"')
-        fi
+        # Get container apps environment info
+        echo "🔍 Querying Container Apps Environment..."
+        ENV_NAME=""
         
-        echo "🔍 Final extracted values:"
+        # Try to get environment with retries
+        for i in {1..5}; do
+          echo "  Attempt $i/5..."
+          ENV_NAME=$(az containerapp env show \
+            --name "${{ env.ENVIRONMENT_NAME }}" \
+            --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+            --query "name" \
+            --output tsv 2>/dev/null || echo "")
+          
+          if [[ -n "$ENV_NAME" ]]; then
+            echo "  ✅ Found environment: $ENV_NAME"
+            break
+          fi
+          sleep 2
+        done
+        
+        # Final validation
+        echo "🔍 Final validation:"
         echo "  Registry Name: $REGISTRY_NAME"
         echo "  Login Server: $REGISTRY_LOGIN_SERVER" 
         echo "  Environment: $ENV_NAME"
         
-        # Validate outputs
-        if [[ "$REGISTRY_NAME" == "null" || "$REGISTRY_LOGIN_SERVER" == "null" || "$ENV_NAME" == "null" ]]; then
-          echo "❌ Error: Failed to extract deployment outputs"
-          echo "Registry Name: $REGISTRY_NAME"
-          echo "Login Server: $REGISTRY_LOGIN_SERVER"
-          echo "Environment: $ENV_NAME"
-          exit 1
+        if [[ -z "$REGISTRY_LOGIN_SERVER" || -z "$ENV_NAME" ]]; then
+          echo "❌ Error: Could not retrieve all required resource information"
+          echo "  Registry Login Server: '$REGISTRY_LOGIN_SERVER'"
+          echo "  Environment Name: '$ENV_NAME'"
+          
+          # Try one more time with resource listing
+          echo "🔍 Attempting resource discovery..."
+          
+          if [[ -z "$REGISTRY_LOGIN_SERVER" ]]; then
+            REGISTRY_LOGIN_SERVER=$(az acr list \
+              --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+              --query "[?contains(name, '$REGISTRY_NAME')].loginServer | [0]" \
+              --output tsv 2>/dev/null || echo "")
+            echo "  Discovered registry server: '$REGISTRY_LOGIN_SERVER'"
+          fi
+          
+          if [[ -z "$ENV_NAME" ]]; then
+            ENV_NAME=$(az containerapp env list \
+              --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+              --query "[?contains(name, '${{ env.ENVIRONMENT_NAME }}')].name | [0]" \
+              --output tsv 2>/dev/null || echo "")
+            echo "  Discovered environment: '$ENV_NAME'"
+          fi
+          
+          # Final check
+          if [[ -z "$REGISTRY_LOGIN_SERVER" || -z "$ENV_NAME" ]]; then
+            echo "❌ Final validation failed - cannot continue"
+            exit 1
+          fi
         fi
         
         # Set outputs for next job
