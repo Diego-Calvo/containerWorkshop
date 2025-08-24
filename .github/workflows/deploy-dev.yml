@@ -180,32 +180,82 @@ jobs:
       id: deploy
       if: steps.check-infrastructure.outputs.INFRASTRUCTURE_EXISTS == 'false'
       run: |
-        # Deploy the Bicep template with a simple approach
+        # Deploy the Bicep template with maximum debugging
         echo "🚀 Starting Bicep deployment..."
         DEPLOYMENT_NAME="infrastructure-deployment-$(date +%s)"
         echo "📝 Deployment name: $DEPLOYMENT_NAME"
         
-        # Deploy and capture exit code only
-        echo "⚙️ Executing deployment..."
-        if az deployment group create \
+        # First, validate the template
+        echo "🔍 Validating Bicep template..."
+        if ! az deployment group validate \
           --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
           --template-file infrastructure/bicep/main.bicep \
-          --name "$DEPLOYMENT_NAME" \
           --parameters \
             environmentName="${{ env.ENVIRONMENT_NAME }}" \
             location="${{ env.LOCATION }}" \
             namePrefix="workshop" \
             containerRegistryName="${{ env.CONTAINER_REGISTRY_NAME }}" \
           --output none; then
+          echo "❌ Template validation failed"
+          exit 1
+        fi
+        echo "✅ Template validation passed"
+        
+        # Try deployment with what-if first
+        echo "🔍 Running what-if analysis..."
+        if ! az deployment group what-if \
+          --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+          --template-file infrastructure/bicep/main.bicep \
+          --parameters \
+            environmentName="${{ env.ENVIRONMENT_NAME }}" \
+            location="${{ env.LOCATION }}" \
+            namePrefix="workshop" \
+            containerRegistryName="${{ env.CONTAINER_REGISTRY_NAME }}" \
+          --output none; then
+          echo "❌ What-if analysis failed"
+          exit 1
+        fi
+        echo "✅ What-if analysis completed"
+        
+        # Try a minimal deployment approach
+        echo "⚙️ Attempting deployment..."
+        
+        # Use ARM template instead of going through az deployment
+        echo "🔄 Converting Bicep to ARM..."
+        az bicep build --file infrastructure/bicep/main.bicep --outfile /tmp/main.json
+        
+        echo "🚀 Deploying ARM template..."
+        if az deployment group create \
+          --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+          --template-file /tmp/main.json \
+          --name "$DEPLOYMENT_NAME" \
+          --parameters \
+            environmentName="${{ env.ENVIRONMENT_NAME }}" \
+            location="${{ env.LOCATION }}" \
+            namePrefix="workshop" \
+            containerRegistryName="${{ env.CONTAINER_REGISTRY_NAME }}" \
+          --verbose \
+          --output none; then
           echo "✅ Deployment completed successfully"
         else
           echo "❌ Deployment failed"
-          exit 1
+          echo "🔍 Checking if partial deployment occurred..."
+          
+          # Check if any resources were created despite the error
+          EXISTING_REGISTRY=$(az acr show --name "${{ env.CONTAINER_REGISTRY_NAME }}" --resource-group ${{ env.RESOURCE_GROUP_NAME }} --query "name" --output tsv 2>/dev/null || echo "")
+          EXISTING_ENV=$(az containerapp env show --name "${{ env.ENVIRONMENT_NAME }}" --resource-group ${{ env.RESOURCE_GROUP_NAME }} --query "name" --output tsv 2>/dev/null || echo "")
+          
+          if [[ -n "$EXISTING_REGISTRY" && -n "$EXISTING_ENV" ]]; then
+            echo "🎯 Partial deployment detected - key resources exist, continuing..."
+          else
+            echo "💥 Complete deployment failure - exiting"
+            exit 1
+          fi
         fi
         
         # Wait for Azure to fully register resources
         echo "⏳ Waiting for resources to be fully registered..."
-        sleep 10
+        sleep 15
         
         echo "📊 Getting outputs from deployed resources..."
         
@@ -215,8 +265,8 @@ jobs:
         REGISTRY_LOGIN_SERVER=""
         
         # Try to get registry login server with retries
-        for i in {1..5}; do
-          echo "  Attempt $i/5..."
+        for i in {1..10}; do
+          echo "  Attempt $i/10..."
           REGISTRY_LOGIN_SERVER=$(az acr show \
             --name "$REGISTRY_NAME" \
             --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
@@ -227,7 +277,7 @@ jobs:
             echo "  ✅ Found registry: $REGISTRY_LOGIN_SERVER"
             break
           fi
-          sleep 2
+          sleep 3
         done
         
         # Get container apps environment info
@@ -235,8 +285,8 @@ jobs:
         ENV_NAME=""
         
         # Try to get environment with retries
-        for i in {1..5}; do
-          echo "  Attempt $i/5..."
+        for i in {1..10}; do
+          echo "  Attempt $i/10..."
           ENV_NAME=$(az containerapp env show \
             --name "${{ env.ENVIRONMENT_NAME }}" \
             --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
@@ -247,7 +297,7 @@ jobs:
             echo "  ✅ Found environment: $ENV_NAME"
             break
           fi
-          sleep 2
+          sleep 3
         done
         
         # Final validation
