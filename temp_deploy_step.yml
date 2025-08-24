@@ -1,0 +1,145 @@
+    - name: Deploy Infrastructure
+      id: deploy
+      if: steps.check-infrastructure.outputs.INFRASTRUCTURE_EXISTS == 'false'
+      run: |
+        # Since Azure CLI is already authenticated, use individual resource creation
+        echo "🚀 Starting infrastructure deployment..."
+        
+        # Create resources individually using the already authenticated Azure CLI
+        echo "🔄 Creating resources individually..."
+        
+        # Create Container Registry
+        echo "📦 Creating Container Registry..."
+        az acr create \
+          --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+          --name ${{ env.CONTAINER_REGISTRY_NAME }} \
+          --sku Standard \
+          --admin-enabled true \
+          --location ${{ env.LOCATION }} \
+          --output table || echo "Registry creation failed or already exists"
+        
+        # Create Log Analytics Workspace
+        echo "📊 Creating Log Analytics Workspace..."
+        az monitor log-analytics workspace create \
+          --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+          --workspace-name workshop-logs \
+          --location ${{ env.LOCATION }} \
+          --output table || echo "Log Analytics creation failed or already exists"
+        
+        # Get Log Analytics Workspace ID
+        echo "🔍 Getting Log Analytics details..."
+        LOG_ANALYTICS_ID=$(az monitor log-analytics workspace show \
+          --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+          --workspace-name workshop-logs \
+          --query "customerId" \
+          --output tsv 2>/dev/null || echo "")
+        
+        LOG_ANALYTICS_KEY=$(az monitor log-analytics workspace get-shared-keys \
+          --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+          --workspace-name workshop-logs \
+          --query "primarySharedKey" \
+          --output tsv 2>/dev/null || echo "")
+        
+        # Create Container Apps Environment
+        echo "🏗️ Creating Container Apps Environment..."
+        if [[ -n "$LOG_ANALYTICS_ID" && -n "$LOG_ANALYTICS_KEY" ]]; then
+          az containerapp env create \
+            --name ${{ env.ENVIRONMENT_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+            --location ${{ env.LOCATION }} \
+            --logs-workspace-id "$LOG_ANALYTICS_ID" \
+            --logs-workspace-key "$LOG_ANALYTICS_KEY" \
+            --output table || echo "Container Apps Environment creation failed or already exists"
+        else
+          az containerapp env create \
+            --name ${{ env.ENVIRONMENT_NAME }} \
+            --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+            --location ${{ env.LOCATION }} \
+            --output table || echo "Container Apps Environment creation failed or already exists"
+        fi
+        
+        # Create Cosmos DB (optional for workshop)
+        echo "🌐 Creating Cosmos DB..."
+        az cosmosdb create \
+          --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+          --name workshop-cosmos-${{ github.run_number }} \
+          --locations regionName=${{ env.LOCATION }} \
+          --default-consistency-level Session \
+          --enable-free-tier true \
+          --output table || echo "Cosmos DB creation failed or already exists"
+        
+        # Wait for resources to be available
+        echo "⏳ Waiting for resources to be fully registered..."
+        sleep 20
+        
+        echo "📊 Getting outputs from deployed resources..."
+        
+        # Get container registry info directly from Azure
+        echo "🔍 Querying Container Registry..."
+        REGISTRY_NAME="${{ env.CONTAINER_REGISTRY_NAME }}"
+        REGISTRY_LOGIN_SERVER=""
+        
+        # Try to get registry login server with retries
+        for i in {1..15}; do
+          echo "  Attempt $i/15..."
+          REGISTRY_LOGIN_SERVER=$(az acr show \
+            --name "$REGISTRY_NAME" \
+            --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+            --query "loginServer" \
+            --output tsv 2>/dev/null || echo "")
+          
+          if [[ -n "$REGISTRY_LOGIN_SERVER" ]]; then
+            echo "  ✅ Found registry: $REGISTRY_LOGIN_SERVER"
+            break
+          fi
+          sleep 4
+        done
+        
+        # Get container apps environment info
+        echo "🔍 Querying Container Apps Environment..."
+        ENV_NAME=""
+        
+        # Try to get environment with retries
+        for i in {1..15}; do
+          echo "  Attempt $i/15..."
+          ENV_NAME=$(az containerapp env show \
+            --name "${{ env.ENVIRONMENT_NAME }}" \
+            --resource-group ${{ env.RESOURCE_GROUP_NAME }} \
+            --query "name" \
+            --output tsv 2>/dev/null || echo "")
+          
+          if [[ -n "$ENV_NAME" ]]; then
+            echo "  ✅ Found environment: $ENV_NAME"
+            break
+          fi
+          sleep 4
+        done
+        
+        # Final validation
+        echo "🔍 Final validation:"
+        echo "  Registry Name: $REGISTRY_NAME"
+        echo "  Login Server: $REGISTRY_LOGIN_SERVER" 
+        echo "  Environment: $ENV_NAME"
+        
+        if [[ -z "$REGISTRY_LOGIN_SERVER" || -z "$ENV_NAME" ]]; then
+          echo "❌ Error: Could not retrieve all required resource information"
+          echo "  Registry Login Server: '$REGISTRY_LOGIN_SERVER'"
+          echo "  Environment Name: '$ENV_NAME'"
+          
+          # List all resources to see what was created
+          echo "🔍 Listing all resources in resource group..."
+          az resource list --resource-group ${{ env.RESOURCE_GROUP_NAME }} --output table || echo "Could not list resources"
+          
+          exit 1
+        fi
+        
+        # Set outputs for next job
+        echo "containerRegistryName=$REGISTRY_NAME" >> $GITHUB_OUTPUT
+        echo "containerRegistryLoginServer=$REGISTRY_LOGIN_SERVER" >> $GITHUB_OUTPUT
+        echo "environmentName=$ENV_NAME" >> $GITHUB_OUTPUT
+        
+        echo "✅ Infrastructure deployed successfully"
+        echo "📦 Container Registry: $REGISTRY_NAME"
+        echo "🌐 Login Server: $REGISTRY_LOGIN_SERVER"
+        echo "🏗️ Environment: $ENV_NAME"
+      shell: bash
