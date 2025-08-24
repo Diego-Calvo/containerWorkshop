@@ -243,8 +243,7 @@ jobs:
           --name workshop-cosmos-${{ github.run_number }} \
           --locations regionName=${{ env.LOCATION }} \
           --default-consistency-level Session \
-          --enable-free-tier true \
-          --output table || echo "Cosmos DB creation failed or already exists"
+          --output table || echo "Cosmos DB creation failed or already exists (this is optional for the workshop)"
         
         # Wait for Azure to fully register resources
         echo "⏳ Waiting for resources to be fully registered..."
