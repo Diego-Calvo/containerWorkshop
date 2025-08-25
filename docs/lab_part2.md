@@ -1,339 +1,294 @@
-# Lab Part 2: Application Deployment & Live Updates
+# 🏆 Hackathon Part 2: Azure Container Apps Production Challenge
 
-## 🎯 **Objective**
-Deploy containerized applications and demonstrate live updates using GitHub Actions.
-
----
-
-## 📋 **Prerequisites**
-- **✅ Lab Part 1 completed** (infrastructure deployed via GitHub Actions)
-- **✅ GitHub repository forked** with Azure credentials configured
-- **Web browser only** (no local tools required!)
+## 🎯 **Mission Brief**
+Your basic application is deployed but it's running in **DEMO MODE**! Your mission is to transform it into a production-ready, secure, and scalable system. You have Cosmos DB infrastructure deployed but your application isn't using it yet - it's still using in-memory storage that disappears when containers restart.
 
 ---
 
-## 🚀 **Lab Steps**
+## 🚨 **Current System Status**
+After Lab Part 1, you have:
+- ✅ **Infrastructure deployed** (Container Apps, Cosmos DB, Container Registry)
+- ✅ **Application running** but with critical limitations:
+  - 🟡 **DAPR Status: Demo Mode** (not connected to real persistence)
+  - 💾 **Data Storage: In-Memory** (data lost on restart!)
+  - 🔓 **Security: Hardcoded credentials** in DAPR components
+  - 🚫 **Persistence: Disabled** (Cosmos DB exists but unused)
 
-### **Step 1: Deploy Applications**
-1. **Go to "Actions" tab** in your forked repository
-2. **Select**: "Deploy to Azure Container Apps"
-3. **Click "Run workflow"**
-4. **Configure parameters**:
-   ```yaml
-   Resource Group Name: containerWorkshop-[yourname]  # Same as Part 1
-   Azure Region: eastus2                              # Same as Part 1
-   Environment Name: workshop-dev-env                 # Same as Part 1
-   Deploy Infrastructure: ❌ false                    # Skip (already done)
-   Deploy Applications: ✅ true                       # Deploy containers
-   ```
-5. **Click "Run workflow"**
-
-### **Step 2: Monitor Application Deployment**
-- **Watch the workflow progress** (~3-5 minutes)
-- **Look for the URLs** in the workflow output:
-  - Frontend URL: `https://workshop-frontend-dev.xxx.eastus2.azurecontainerapps.io`
-  - Backend URL: `https://workshop-backend-dev.xxx.eastus2.azurecontainerapps.io`
-
-### **Step 3: Test Your Application**
-1. **Open the Frontend URL** from the workflow output
-2. **Verify features work**:
-   - ✅ Add new todo items
-   - ✅ Mark items as complete
-   - ✅ Network activity dashboard shows API calls
-   - ✅ Container communication visualization
-3. **Test Backend API**: Add `/health` to backend URL
+**Your job**: Fix these production issues!
 
 ---
 
-## 🔄 **Live Development & Updates**
+## ⚡ **Hackathon Challenges**
 
-### **Step 4: Make Code Changes (Choose One)**
+## ⚡ **Hackathon Challenges**
 
-#### **Option A: Simple Frontend Update**
-1. **Go to your repository** → **Code tab**
-2. **Navigate to**: `frontend/src/App.js`
-3. **Click the edit icon** (pencil)
-4. **Find line ~94** with the heading text
-5. **Change to**: `<h1>🚀 [Your Name]'s Container Apps Demo</h1>`
-6. **Commit directly to main branch**
+### 🥇 **Challenge 1: Enable Production DAPR** 
+**Mission**: Get DAPR working with Cosmos DB for real persistence
 
-#### **Option B: Add Backend API Endpoint**
-1. **Navigate to**: `backend/src/app.js`
-2. **Click edit** and **find line ~185** (after the stats endpoint)
-3. **Add this new endpoint**:
-   ```javascript
-   // Custom greeting endpoint for workshop
-   app.get('/api/hello/:name', (req, res) => {
-     try {
-       const { name } = req.params;
-       res.json({ 
-         message: `Hello ${name}! Welcome to Azure Container Apps!`,
-         workshop: 'Container Apps Demo',
-         timestamp: new Date().toISOString(),
-         containerHost: process.env.HOSTNAME || 'unknown'
-       });
-     } catch (error) {
-       res.status(500).json({ error: 'Failed to greet' });
-     }
-   });
-   ```
-4. **Commit directly to main branch**
+**Current Problem**: Your backend has `ENABLE_DAPR = false` hardcoded
+**Goal**: Enable DAPR so the app shows "� Production Mode" instead of "🟡 Demo Mode"
 
-### **Step 5: Automatic Redeployment**
-1. **Watch the "Actions" tab** - deployment starts automatically!
-2. **Monitor the workflow** (~3-5 minutes)
-3. **Wait for completion** (green checkmarks)
+**Hints**:
+- Check `backend/src/app.js` line ~22 for the DAPR enablement flag
+- Look for environment variable `ENABLE_DAPR` 
+- Container Apps have environment variable configuration
+- Use Azure Portal or Azure CLI to set container app environment variables
 
-### **Step 6: Verify Live Updates**
-1. **Refresh your application** in the browser
-2. **See your changes live**:
-   - Frontend: Updated title with your name
-   - Backend: Test new endpoint: `BACKEND-URL/api/hello/YourName`
+**Success Criteria**: 
+- Frontend shows "DAPR Status: 🟢 Production Mode"
+- Backend logs show "DAPR enabled: true"
 
 ---
 
-## 🧪 **Advanced Exercises** (Optional)
+### 🥈 **Challenge 2: Fix DAPR Component Security**
+**Mission**: Replace hardcoded credentials with secure Azure Key Vault integration
 
-### **Exercise 1: Add Statistics to Frontend**
-Add this to `frontend/src/App.js` in the render section:
-```javascript
-{stats && (
-  <div className="stats-summary">
-    <p>📊 Total: {stats.total} | ✅ Done: {stats.completed} | ⏳ Pending: {stats.pending}</p>
-  </div>
-)}
+**Current Problem**: DAPR components have placeholder passwords and Redis configuration
+**Goal**: Configure secure Cosmos DB connection with proper authentication
+
+**Files to investigate**:
+```
+backend/dapr-components/statestore.yaml  # Currently uses Redis!
+infrastructure/bicep/main.bicep          # Has Cosmos DB resources
 ```
 
-### **Exercise 2: Custom API Response**
-Modify the health endpoint in `backend/src/app.js`:
-```javascript
-// Update the health endpoint (around line 170)
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'healthy', 
-    timestamp: new Date().toISOString(),
-    version: process.env.APP_VERSION || '1.0.0',
-    workshop: 'Azure Container Apps Demo',
-    student: 'YOUR-NAME-HERE',  // Add your name
-    dapr: { enabled: !!process.env.DAPR_ENABLED }
-  });
-});
+**Hints**:
+- Your infrastructure already has Cosmos DB deployed, but DAPR components point to Redis
+- Look for `state.azure.cosmosdb` component type in the Bicep file
+- DAPR components should be deployed to the Container Apps Environment, not as local files
+- Azure Portal > Container Apps Environment > DAPR Components shows current config
+- Research: `az containerapp env dapr-component` CLI commands
+
+**Success Criteria**:
+- DAPR state store points to Cosmos DB (not Redis)
+- No hardcoded passwords in DAPR component configuration
+- Data persists after container restarts
+
+---
+
+### � **Challenge 3: Implement Zero-Downtime Persistence**
+**Mission**: Verify data survives container restarts and scaling events
+
+**Current Problem**: In-memory storage loses data when pods restart
+**Goal**: All todo items persist through restarts, scaling, and redeployments
+
+**Test Scenarios**:
+1. Add todo items
+2. Restart container app 
+3. Scale to 0 and back to 1
+4. Redeploy application
+5. Verify data persists through all scenarios
+
+**Hints**:
+- Use `az containerapp update` to trigger restart
+- Use `az containerapp revision` commands for zero-downtime testing
+- Check Azure Portal metrics for restart events
+- Monitor Cosmos DB Data Explorer for actual data persistence
+
+**Success Criteria**:
+- Todo items survive container restarts
+- No data loss during scaling events
+- Cosmos DB Data Explorer shows stored todo data
+
+---
+
+### 🏅 **Challenge 4: Production Monitoring & Observability**
+**Mission**: Implement comprehensive monitoring for production readiness
+
+**Current Problem**: Basic health checks only
+**Goal**: Full observability with Application Insights integration
+
+**Monitoring Targets**:
+- DAPR sidecar health and metrics
+- Cosmos DB connection status and performance
+- Container Apps scaling events
+- Application performance and errors
+
+**Hints**:
+- Application Insights is already deployed in your Bicep template
+- Research DAPR observability configuration
+- Check Container Apps Environment DAPR configuration for monitoring
+- Look into DAPR tracing and metrics collection
+- Azure Portal > Application Insights > Live Metrics
+
+**Success Criteria**:
+- Application Insights shows DAPR traces
+- Cosmos DB metrics visible in Azure Portal
+- Custom application metrics tracked
+- End-to-end transaction tracing working
+
+---
+
+### 🎖️ **Challenge 5: Advanced Security Hardening**
+**Mission**: Implement production-grade security measures
+
+**Security Gaps**:
+- Container images running as root
+- No network policies
+- Missing secrets management
+- No resource limits
+
+**Security Objectives**:
+1. **Container Security**: Non-root container execution
+2. **Network Security**: Proper ingress and VNET integration  
+3. **Secrets Management**: Azure Key Vault for all sensitive data
+4. **Resource Limits**: Proper CPU/memory constraints
+
+**Hints**:
+- Dockerfile security: USER directive, minimal base images
+- Container Apps: Security context and resource limits
+- VNET integration for Container Apps Environment
+- Key Vault references in Container Apps configuration
+- Azure Security Center recommendations
+
+**Success Criteria**:
+- Containers run as non-root user
+- All secrets stored in Azure Key Vault
+- Resource limits prevent resource exhaustion
+- Network traffic properly isolated
+
+---
+
+### 🚀 **Bonus Challenge: Multi-Region Resilience**
+**Mission**: Deploy for global scale and disaster recovery
+
+**Advanced Objectives**:
+- Multi-region deployment with traffic distribution
+- Cross-region data replication 
+- Automated failover mechanisms
+- Performance optimization for global users
+
+**Hints**:
+- Azure Traffic Manager or Front Door
+- Cosmos DB global distribution
+- Container Apps in multiple regions
+- GitHub Actions matrix strategy for multi-region deployment
+
+---
+
+## 🛠️ **Hackathon Resources**
+
+### **Essential Documentation**
+- [DAPR on Azure Container Apps](https://docs.microsoft.com/azure/container-apps/dapr-overview)
+- [DAPR State Management](https://docs.dapr.io/developing-applications/building-blocks/state-management/)
+- [Container Apps Environment Variables](https://docs.microsoft.com/azure/container-apps/environment-variables)
+- [Cosmos DB DAPR Component](https://docs.dapr.io/reference/components-reference/supported-state-stores/setup-azure-cosmosdb/)
+
+### **Key Azure CLI Commands**
+```powershell
+# View current environment variables
+az containerapp show --name workshop-backend-dev --resource-group [your-rg] --query "properties.template.containers[0].env"
+
+# Update environment variables
+az containerapp update --name workshop-backend-dev --resource-group [your-rg] --set-env-vars "ENABLE_DAPR=true"
+
+# Check DAPR components
+az containerapp env dapr-component list --name [your-environment] --resource-group [your-rg]
+
+# View logs
+az containerapp logs show --name workshop-backend-dev --resource-group [your-rg] --follow
 ```
 
----
+### **Debugging Tools**
+- **Azure Portal**: Container Apps > Logs and Metrics
+- **Application Insights**: Live Metrics and Transaction Search  
+- **Cosmos DB Data Explorer**: Verify data persistence
+- **Container Registry**: Image vulnerability scanning
+- **GitHub Actions**: Deployment logs and artifacts
 
-## 📊 **Understanding the Architecture**
-
-```
-📱 Frontend (React)          🔗 Backend (Node.js + DAPR)
-├─ Network Dashboard    ↔️    ├─ REST API Endpoints
-├─ Todo Management            ├─ Health Checks  
-├─ Real-time Updates          ├─ Statistics Engine
-└─ Container Visualization    └─ DAPR State Management
-                                      ↕️
-                              💾 Cosmos DB (State Store)
-```
-
-### **What Happens During Deployment:**
-1. **📦 Container Build**: Docker images created from your code
-2. **📤 Registry Push**: Images uploaded to Azure Container Registry
-3. **🚀 App Update**: Container Apps pull new images automatically
-4. **🔄 Zero Downtime**: Rolling deployment with health checks
-
----
-
-## 🔧 **Monitoring & Troubleshooting**
-
-### **View Application Logs** (Azure Portal)
-1. **Go to**: https://portal.azure.com
-2. **Navigate to**: Your resource group → Container App
-3. **Select**: "Log stream" or "Logs" 
-4. **Monitor**: Real-time application behavior
-
-### **Application Health Checks**
-- **Frontend Health**: Should load the todo application
-- **Backend Health**: `BACKEND-URL/health` should return JSON
-- **API Functionality**: `BACKEND-URL/api/todos` should return todo array
-
----
-
-## 🎯 **Workshop Success Checklist**
-
-- [ ] ✅ **Infrastructure deployed** via GitHub Actions (Part 1)
-- [ ] ✅ **Applications running** and accessible via URLs
-- [ ] ✅ **Frontend displays** todo interface with network dashboard
-- [ ] ✅ **Backend API responds** to health and todo endpoints
-- [ ] ✅ **Code changes made** and committed to repository
-- [ ] ✅ **Automatic redeployment** completed successfully
-- [ ] ✅ **Live updates verified** in running application
-
----
-
-## 🧹 **Cleanup** (End of Workshop)
+### **Testing Strategies**
 ```bash
-# In Azure Cloud Shell or local Azure CLI
+# Test DAPR sidecar
+curl https://[backend-url]/health
+
+# Test state persistence  
+curl -X POST https://[backend-url]/api/todos -H "Content-Type: application/json" -d '{"text":"Test persistence"}'
+
+# Check Cosmos DB directly
+# Use Azure Portal > Cosmos DB > Data Explorer
+```
+
+---
+
+## 🎯 **Hackathon Scoring**
+
+| Challenge | Points | Difficulty | Time Estimate |
+|-----------|--------|------------|---------------|
+| **Challenge 1**: Enable DAPR | 20 pts | ⭐⭐ | 15-30 min |
+| **Challenge 2**: Fix Security | 30 pts | ⭐⭐⭐ | 30-60 min |
+| **Challenge 3**: Zero-Downtime | 25 pts | ⭐⭐⭐ | 20-45 min |
+| **Challenge 4**: Monitoring | 35 pts | ⭐⭐⭐⭐ | 45-90 min |
+| **Challenge 5**: Security Hardening | 40 pts | ⭐⭐⭐⭐⭐ | 60-120 min |
+| **Bonus**: Multi-Region | 50 pts | ⭐⭐⭐⭐⭐ | 90-180 min |
+
+**Total Possible**: 200 points (250 with bonus)
+
+---
+
+## 🏆 **Victory Conditions**
+
+### **🥉 Bronze Medal** (60+ points)
+- DAPR enabled and working
+- Basic Cosmos DB persistence
+- Data survives restarts
+
+### **🥈 Silver Medal** (120+ points)  
+- Secure DAPR configuration
+- Comprehensive monitoring
+- Production-ready observability
+
+### **🥇 Gold Medal** (180+ points)
+- Full security hardening
+- Advanced monitoring and alerting
+- Enterprise-ready deployment
+
+### **🏆 Platinum Achievement** (230+ points)
+- Multi-region deployment
+- Disaster recovery capability
+- Global scale readiness
+
+---
+
+## 💡 **Getting Stuck? Troubleshooting Tips**
+
+### **DAPR Not Starting**
+- Check container app logs for DAPR sidecar errors
+- Verify DAPR components are deployed to the environment
+- Ensure DAPR app-id matches between frontend and backend
+
+### **Cosmos DB Connection Issues**
+- Verify Cosmos DB firewall allows Container Apps
+- Check DAPR component configuration syntax
+- Validate connection string and authentication
+
+### **Data Not Persisting**
+- Confirm DAPR state store is properly configured
+- Check if backend is actually calling DAPR APIs
+- Verify Cosmos DB container and database exist
+
+### **Performance Issues**
+- Review Container Apps resource limits
+- Check Cosmos DB request units (RU) throttling
+- Monitor Application Insights for bottlenecks
+
+---
+
+## 🧹 **Clean Up** (After Hackathon)
+```powershell
+# Remove all resources
 az group delete --name containerWorkshop-[yourname] --yes --no-wait
 ```
 
 ---
 
-## 🎉 **Congratulations!**
+## 🎉 **Ready to Start?**
 
-You've successfully:
-- 🏗️ **Deployed infrastructure** using GitHub Actions and Bicep
-- 🚀 **Containerized and deployed** a two-tier application
-- 🔄 **Implemented CI/CD** with automatic deployments
-- 📊 **Experienced** Azure Container Apps with DAPR integration
-- ⚡ **Made live updates** without any local development tools
+1. **Check your current deployment** - Visit your app URL from Lab Part 1
+2. **Confirm it shows Demo Mode** - This is your starting point
+3. **Pick your first challenge** - Start with Challenge 1 for quick wins
+4. **Use Azure Portal + GitHub** - No local development tools required!
+5. **Ask for help** - Collaboration encouraged for learning
 
-**⏱️ Lab Duration**: ~30-45 minutes  
-**🎯 Skills Learned**: GitHub Actions, Container Apps, DAPR, CI/CD workflows
-- **Check for successful completion** (green checkmarks)
-- **Copy application URLs** from workflow output
-
-### **Step 5: Test Application**
-1. **Frontend**: Open the frontend URL from workflow output
-2. **Backend API**: Test health endpoint: `BACKEND-URL/health`
-3. **Verify features**:
-   - Todo management
-   - Network activity dashboard  
-   - Container communication visualization
-
----
-
-## 🔄 **Live Development Workflow**
-
-### **Modify Code & Redeploy**
-1. **Edit application code** (frontend or backend)
-2. **Commit changes**:
-   ```bash
-   git add .
-   git commit -m "Update: describe your changes"
-   git push origin dev
-   ```
-3. **Automatic deployment** triggers on dev branch push
-
-### **Example Code Changes**
-
-**Frontend Customization** (`frontend/src/App.js`):
-```javascript
-// Change line ~45
-<h1>🚀 [Your Name]'s Container Apps Demo</h1>
-```
-
-**Backend API Addition** (`backend/src/app.js`):
-```javascript
-// Add new endpoint
-app.get('/api/hello/:name', (req, res) => {
-  res.json({ 
-    message: `Hello ${req.params.name}! Welcome to Container Apps!`,
-    timestamp: new Date().toISOString()
-  });
-});
-```
-
----
-
-## 📊 **Application Architecture**
-
-```
-┌─────────────────┐    ┌─────────────────┐
-│   Frontend      │    │   Backend       │
-│   (React)       │◄──►│   (Node.js)     │
-│   Port: 80      │    │   Port: 3001    │
-│                 │    │   DAPR Enabled  │
-└─────────────────┘    └─────────────────┘
-         │                       │
-         └───────────────────────┘
-                   │
-         ┌─────────────────┐
-         │   Cosmos DB     │
-         │   (DAPR State)  │
-         └─────────────────┘
-```
-
----
-
-## 🔧 **Advanced Operations**
-
-### **Container Scaling**
-```powershell
-# Scale frontend
-az containerapp update `
-  --name workshop-frontend-dev `
-  --resource-group containerWorkshop `
-  --min-replicas 1 `
-  --max-replicas 5
-
-# Check scaling status
-az containerapp show `
-  --name workshop-frontend-dev `
-  --resource-group containerWorkshop `
-  --query "properties.template.scale"
-```
-
-### **View Logs**
-```powershell
-# Frontend logs
-az containerapp logs show `
-  --name workshop-frontend-dev `
-  --resource-group containerWorkshop `
-  --follow
-
-# Backend logs  
-az containerapp logs show `
-  --name workshop-backend-dev `
-  --resource-group containerWorkshop `
-  --follow
-```
-
-### **Environment Variables**
-```bash
-# Update backend environment
-az containerapp update \
-  --name workshop-backend-dev \
-  --resource-group containerWorkshop \
-  --set-env-vars "CUSTOM_MESSAGE=Hello from Container Apps!"
-```
-
----
-
-## 🧪 **Hands-On Exercises**
-
-### **Exercise 1**: Add Custom Greeting API
-1. Add new endpoint to backend
-2. Push to dev branch for automatic deployment
-3. Test the new endpoint
-
-### **Exercise 2**: Update Frontend UI
-1. Customize the welcome message
-2. Add your name to the title
-3. Push changes and verify automatic deployment
-
-### **Exercise 3**: Monitor Application
-1. Check logs in Azure Portal
-2. View metrics and performance
-3. Test scaling behavior
-
----
-
-## 🧹 **Cleanup** (End of Workshop)
-```powershell
-# In Azure Cloud Shell or local Azure CLI
-az group delete --name containerWorkshop-[yourname] --yes --no-wait
-```
-
----
-
-## ✅ **Lab Completion Checklist**
-- [ ] Repository forked and cloned
-- [ ] GitHub Actions configured with Azure credentials
-- [ ] Applications deployed via GitHub Actions
-- [ ] Frontend application accessible and functional
-- [ ] Backend API responding to health checks
-- [ ] Container communication visible in UI
-- [ ] Code changes trigger automatic deployment
-- [ ] Application monitoring and logs reviewed
-
-**⏱️ Lab Duration**: ~30-45 minutes  
-**🎯 Skills Learned**: Container Apps deployment, GitHub Actions, DAPR integration, monitoring
+**⏱️ Hackathon Duration**: 2-4 hours  
+**🎯 Skills Gained**: DAPR mastery, Azure security, production deployment, observability  
+**🏅 Achievement Unlocked**: Azure Container Apps Expert!
